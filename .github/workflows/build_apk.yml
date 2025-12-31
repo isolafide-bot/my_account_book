@@ -1,22 +1,27 @@
 name: Build APK
-
 on:
   push:
-    branches: [ "main" ] # 메인 코드가 업데이트되면 자동으로 시작
-
+    branches: [ "main" ]
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-      - run: flutter pub get # 필요한 도구들(엑셀, 차트 등) 불러오기
-      - run: flutter build apk --split-per-abi # APK 파일 만들기
+          
+      # [핵심 추가] 안드로이드 빌드에 필요한 뼈대 파일을 자동으로 생성합니다.
+      - run: flutter create . --platforms=android
+      
+      - run: flutter pub get
+      
+      # 에러 방지를 위해 --debug 모드로 먼저 빌드합니다.
+      - run: flutter build apk --debug
       
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: my-account-book-app
+          path: build/app/outputs/flutter-apk/app-debug.apk
