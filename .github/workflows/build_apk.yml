@@ -1,0 +1,22 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ "main" ] # 메인 코드가 업데이트되면 자동으로 시작
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - run: flutter pub get # 필요한 도구들(엑셀, 차트 등) 불러오기
+      - run: flutter build apk --split-per-abi # APK 파일 만들기
+      
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
