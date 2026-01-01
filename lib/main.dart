@@ -101,12 +101,12 @@ class _MainHomeState extends State<MainHome> with SingleTickerProviderStateMixin
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('💎 가계부 앱'),
-        bottom: TabBar(controller: _tab, tabs: const [Tab(text: '내역 입력'), Tab(text: '요약 통계')]),
+        title: const Text('💎 나의 가계부'),
+        bottom: TabBar(controller: _tab, tabs: const [Tab(text: '내역 입력'), Tab(text: '통계 요약')]),
       ),
       body: TabBarView(controller: _tab, children: [
         const AccountTab(),
-        const Center(child: Text("통계 준비 중")),
+        const Center(child: Text("통계 화면 준비 중")),
       ]),
     );
   }
