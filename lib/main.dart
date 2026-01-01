@@ -19,7 +19,7 @@ void main() => runApp(
 class AccountBookData extends ChangeNotifier {
   final NumberFormat _nf = NumberFormat('#,###');
 
-  // 화면 코드와 이름을 맞추기 위해 언더바(_)를 제거했습니다.
+  // 화면 코드에서 사용하는 이름과 똑같이 맞췄습니다 (언더바 제거)
   Map<String, int> incomeItems = {
     '기본급': 0, '장기근속수당': 0, '시간외근무수당': 0, '가족수당': 0,
     '식대보조비': 0, '대우수당': 0, '직무수행급': 0, '성과급': 0,
@@ -37,10 +37,10 @@ class AccountBookData extends ChangeNotifier {
     '암사동': 300000, '주택청약': 100000, '모임회비': 30000, '용돈': 500000,
   };
   Map<String, int> variableItems = {
-    '식비': 0, '교통비': 0, '생필품': 0, '유흥비': 0, '기타': 0,
+    '식비': 0, '교통비': 0, '생필품': 0, '통신비': 0, '기타': 0,
   };
   Map<String, int> childItems = {
-    '교육비(똘1)': 0, '교육비(똘2)': 0, '기타(자녀)': 0,
+    '교육비(똘1)': 0, '교육비(똘2)': 0, '자녀기타': 0,
   };
   List<CardExpense> cardExpenses = [];
 
@@ -96,12 +96,12 @@ class AccountBookData extends ChangeNotifier {
     fixedItems.forEach((k, v) => rows.add(["고정", k, v]));
     variableItems.forEach((k, v) => rows.add(["변동", k, v]));
     childItems.forEach((k, v) => rows.add(["자녀", k, v]));
-    for (var e in cardExpenses) { rows.add(["카드", e.desc, e.amount]); }
+    for (var e in cardExpenses) { rows.add(["카드지출", e.desc, e.amount]); }
     String csv = const ListToCsvConverter().convert(rows);
     final dir = await getApplicationDocumentsDirectory();
     final file = File("${dir.path}/account_book.csv");
     await file.writeAsString(csv);
-    await Share.shareXFiles([XFile(file.path)], text: '가계부 엑셀 파일');
+    await Share.shareXFiles([XFile(file.path)], text: '나의 가계부 엑셀 데이터');
   }
 }
 
@@ -120,7 +120,7 @@ class MyDetailedAccountBook extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.blueGrey, useMaterial3: true),
+      theme: ThemeData(primarySwatch: Colors.indigo, useMaterial3: true),
       home: const MainHome(),
     );
   }
@@ -177,7 +177,7 @@ class ExpenseTab extends StatelessWidget {
       ])),
       Container(color: Colors.grey[100], padding: const EdgeInsets.all(8), child: Column(children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-          _miniSum("고정합계", d.sumFixed, d), _miniSum("변동합계", d.sumVariable, d), _miniSum("자녀합계", d.sumChild, d),
+          _miniSum("고정", d.sumFixed, d), _miniSum("변동", d.sumVariable, d), _miniSum("자녀", d.sumChild, d),
         ]),
         const Divider(),
         _summaryBox("총 지출액", d.totalExp, Colors.deepOrange, d),
@@ -213,7 +213,7 @@ class StatsTab extends StatelessWidget {
     final d = context.watch<AccountBookData>();
     return Column(children: [
       const SizedBox(height: 20),
-      const Text("📊 지출 비중", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      const Text("📊 지출 비중 분석", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
       Expanded(child: PieChart(PieChartData(sections: [
         PieChartSectionData(color: Colors.teal, value: d.sumFixed.toDouble(), title: '고정', radius: 50),
         PieChartSectionData(color: Colors.orange, value: d.sumVariable.toDouble(), title: '변동', radius: 50),
@@ -253,7 +253,7 @@ Widget _miniSum(String label, int val, AccountBookData d) {
 void _showCardDialog(BuildContext context, AccountBookData d) {
   String desc = "", card = "우리카드", note = ""; int amount = 0; bool isFee = false;
   showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
-    title: const Text("카드 지출"),
+    title: const Text("카드 지출 추가"),
     content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
       DropdownButton<String>(isExpanded: true, value: card, items: ["우리카드", "현대카드", "KB카드", "LG카드", "삼성카드", "신한카드"].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setS(() => card = v!)),
       TextField(decoration: const InputDecoration(labelText: "내역"), onChanged: (v) => desc = v),
