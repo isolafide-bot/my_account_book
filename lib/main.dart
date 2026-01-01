@@ -102,11 +102,11 @@ class _MainHomeState extends State<MainHome> with SingleTickerProviderStateMixin
     return Scaffold(
       appBar: AppBar(
         title: const Text('💎 가계부'),
-        bottom: TabBar(controller: _tab, tabs: const [Tab(text: '내역 입력'), Tab(text: '통계 분석')]),
+        bottom: TabBar(controller: _tab, tabs: const [Tab(text: '급여/지출'), Tab(text: '카드관리')]),
       ),
       body: TabBarView(controller: _tab, children: [
         const AccountTab(),
-        const Center(child: Text("분석 차트 준비 중")),
+        const Center(child: Text("카드 지출 관리 화면")),
       ]),
     );
   }
@@ -122,7 +122,7 @@ class AccountTab extends StatelessWidget {
         _listSection("➕ 수입", d.incomeItems, 'income', Colors.blue, d),
         _listSection("➖ 공제", d.deductionItems, 'deduction', Colors.red, d),
         _listSection("🏦 고정지출", d.fixedItems, 'fixed', Colors.teal, d),
-        _summaryBox("총 실지출액", d.totalExp, Colors.deepOrange, d),
+        _summaryBox("총 지출액", d.totalExp, Colors.deepOrange, d),
       ]),
     );
   }
