@@ -19,7 +19,7 @@ void main() => runApp(
 class AccountBookData extends ChangeNotifier {
   final NumberFormat _nf = NumberFormat('#,###');
 
-  // 화면 코드에서 사용하는 이름과 똑같이 맞췄습니다 (언더바 제거)
+  // 화면 코드에서 호출하는 이름과 정확히 일치시켰습니다.
   Map<String, int> incomeItems = {
     '기본급': 0, '장기근속수당': 0, '시간외근무수당': 0, '가족수당': 0,
     '식대보조비': 0, '대우수당': 0, '직무수행급': 0, '성과급': 0,
@@ -101,7 +101,7 @@ class AccountBookData extends ChangeNotifier {
     final dir = await getApplicationDocumentsDirectory();
     final file = File("${dir.path}/account_book.csv");
     await file.writeAsString(csv);
-    await Share.shareXFiles([XFile(file.path)], text: '나의 가계부 엑셀 데이터');
+    await Share.shareXFiles([XFile(file.path)], text: '가계부 엑셀 내보내기');
   }
 }
 
@@ -177,7 +177,7 @@ class ExpenseTab extends StatelessWidget {
       ])),
       Container(color: Colors.grey[100], padding: const EdgeInsets.all(8), child: Column(children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-          _miniSum("고정", d.sumFixed, d), _miniSum("변동", d.sumVariable, d), _miniSum("자녀", d.sumChild, d),
+          _miniSum("고정합계", d.sumFixed, d), _miniSum("변동합계", d.sumVariable, d), _miniSum("자녀합계", d.sumChild, d),
         ]),
         const Divider(),
         _summaryBox("총 지출액", d.totalExp, Colors.deepOrange, d),
@@ -197,11 +197,11 @@ class CardTab extends StatelessWidget {
         rows: List.generate(d.cardExpenses.length, (i) {
           final e = d.cardExpenses[i];
           return DataRow(cells: [
-            DataCell(Text('${i + 1}')), DataCell(Text(e.card)), DataCell(Text(e.desc)), DataCell(Text(d.format(e.amount))), DataCell(Text(e.isFee ? 'O' : 'X')), DataCell(Text(e.note)),
+            DataCell(Text('${i + 1}')), DataCell(Text(e.card)), DataCell(Text(e.desc)), DataCell(Text(d.format(e.amount))), DataCell(Text(e.isFee ? '회비' : '일반')), DataCell(Text(e.note)),
           ]);
         }),
       ))),
-      Padding(padding: const EdgeInsets.all(8), child: ElevatedButton.icon(onPressed: () => _showCardDialog(context, d), icon: const Icon(Icons.add), label: const Text("지출 추가"))),
+      Padding(padding: const EdgeInsets.all(8), child: ElevatedButton.icon(onPressed: () => _showCardDialog(context, d), icon: const Icon(Icons.add), label: const Text("카드 지출 추가"))),
     ]);
   }
 }
@@ -219,6 +219,7 @@ class StatsTab extends StatelessWidget {
         PieChartSectionData(color: Colors.orange, value: d.sumVariable.toDouble(), title: '변동', radius: 50),
         PieChartSectionData(color: Colors.purple, value: d.sumChild.toDouble(), title: '자녀', radius: 50),
       ]))),
+      const Padding(padding: EdgeInsets.all(16), child: Text("항목별 상세 필터 기능 준비 중", style: TextStyle(color: Colors.grey))),
     ]);
   }
 }
@@ -251,7 +252,8 @@ Widget _miniSum(String label, int val, AccountBookData d) {
 }
 
 void _showCardDialog(BuildContext context, AccountBookData d) {
-  String desc = "", card = "우리카드", note = ""; int amount = 0; bool isFee = false;
+  String date = DateFormat('MM/dd').format(DateTime.now()), desc = "", card = "우리카드", note = "";
+  int amount = 0; bool isFee = false;
   showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
     title: const Text("카드 지출 추가"),
     content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -259,8 +261,8 @@ void _showCardDialog(BuildContext context, AccountBookData d) {
       TextField(decoration: const InputDecoration(labelText: "내역"), onChanged: (v) => desc = v),
       TextField(decoration: const InputDecoration(labelText: "금액"), keyboardType: TextInputType.number, onChanged: (v) => amount = int.tryParse(v) ?? 0),
       TextField(decoration: const InputDecoration(labelText: "비고"), onChanged: (v) => note = v),
-      CheckboxListTile(title: const Text("회비 여부"), value: isFee, onChanged: (v) => setS(() => isFee = v!)),
+      CheckboxListTile(title: const Text("회비인가요?"), value: isFee, onChanged: (v) => setS(() => isFee = v!)),
     ])),
-    actions: [TextButton(onPressed: () { d.addCardExpense(CardExpense(date: "", desc: desc, card: card, amount: amount, isFee: isFee, note: note)); Navigator.pop(ctx); }, child: const Text("저장"))],
+    actions: [TextButton(onPressed: () { d.addCardExpense(CardExpense(date: date, desc: desc, card: card, amount: amount, isFee: isFee, note: note)); Navigator.pop(ctx); }, child: const Text("저장"))],
   )));
 }
