@@ -12,14 +12,14 @@ jobs:
           channel: 'stable'
           flutter-version: '3.19.0'
       
-      # 1. 기존 충돌 설정들을 깨끗하게 지우고 안드로이드 환경을 새로 구축합니다.
+      # 1. 기존 충돌 설정들을 깨끗하게 지우고 안드로이드 빌드 환경을 새로 구축합니다.
       - run: |
           rm -rf android
           flutter create . --platforms=android
       
       - run: flutter pub get
       
-      # 2. [핵심] 라이브러리 중복 충돌을 방지하는 특수 설정(Jetifier)을 강제로 주입합니다.
+      # 2. [핵심] 라이브러리 중복 충돌을 방지하는 특수 설정을 강제로 주입합니다.
       - run: |
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
