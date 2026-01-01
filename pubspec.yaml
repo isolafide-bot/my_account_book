@@ -9,14 +9,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # 여기서부터 아래 항목들이 모두 있어야 합니다
   provider: ^6.1.1
   shared_preferences: ^2.2.2
   path_provider: ^2.1.2
   csv: ^6.0.0
   share_plus: ^7.2.1
   fl_chart: ^0.66.0
-  intl: ^0.19.0 # <--- 날짜와 금액 콤마 표시를 위해 꼭 필요합니다!
+  intl: ^0.19.0 # <--- 이 부분이 빠지면 에러가 납니다!
 
 dev_dependencies:
   flutter_test:
