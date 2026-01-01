@@ -19,7 +19,7 @@ jobs:
       
       - run: flutter pub get
       
-      # 2. [핵심] 라이브러리 중복 충돌을 방지하는 특수 설정을 강제로 주입합니다.
+      # 2. [핵심] 라이브러리 중복 충돌을 방지하는 특수 설정을 주입합니다.
       - run: |
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
