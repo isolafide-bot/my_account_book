@@ -12,18 +12,16 @@ jobs:
           channel: 'stable'
           flutter-version: '3.19.0'
       
-      # 1. 꼬여있는 기존 안드로이드 설정을 삭제하고 새로 생성합니다.
-      - run: |
-          rm -rf android
-          flutter create . --platforms=android
+      # 1. 꼬인 안드로이드 설정을 완전히 삭제합니다.
+      - run: rm -rf android
+      
+      # 2. 최신 표준 방식으로 안드로이드 뼈대를 새로 생성합니다. (강제 옵션 배제)
+      - run: flutter create . --platforms=android
       
       - run: flutter pub get
       
-      # 2. [핵심] 라이브러리 중복 충돌을 방지하는 특수 설정을 강제로 주입합니다.
-      - run: |
-          echo "android.useAndroidX=true" >> android/gradle.properties
-          echo "android.enableJetifier=true" >> android/gradle.properties
-          flutter build apk --debug
+      # 3. 별도의 주입 없이 표준 빌드를 실행합니다.
+      - run: flutter build apk --debug
       
       - name: Upload APK
         uses: actions/upload-artifact@v4
