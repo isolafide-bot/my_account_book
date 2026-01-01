@@ -14,66 +14,44 @@ void main() => runApp(
 class AccountBookData extends ChangeNotifier {
   final NumberFormat nf = NumberFormat('#,###');
 
-  // UI에서 즉시 접근할 수 있도록 모든 언더바(_)를 제거하고 명칭을 맞췄습니다.
+  // 모든 변수를 공개(Public)로 설정하고 UI에서 호출하는 이름과 100% 일치시켰습니다.
   Map<String, int> incomeItems = {'기본급': 0, '수당': 0, '성과급': 0};
   Map<String, int> deductionItems = {'갑근세': 0, '주민세': 0, '보험료': 0};
   Map<String, int> fixedItems = {'보험': 133221, '연금': 200000, '청약': 100000, '용돈': 500000};
-  Map<String, int> variableItems = {'식비': 0, '교통비': 0, '생필품': 0};
-  Map<String, int> childItems = {'교육비': 0, '간식비': 0};
-  List<CardExpense> cardExpenses = [];
+  int totalExp = 0;
 
-  AccountBookData() { loadData(); }
+  AccountBookData() { _loadData(); }
 
   void updateItem(String type, String name, int value) {
     if (type == 'income') incomeItems[name] = value;
     else if (type == 'deduction') deductionItems[name] = value;
     else if (type == 'fixed') fixedItems[name] = value;
-    else if (type == 'variable') variableItems[name] = value;
-    else if (type == 'child') childItems[name] = value;
+    _calculateTotal();
     notifyListeners();
-    saveData();
+    _saveData();
   }
 
-  void addCardExpense(CardExpense e) { cardExpenses.add(e); notifyListeners(); saveData(); }
-
-  int get sumIncome => incomeItems.values.fold(0, (a, b) => a + b);
-  int get sumDeduction => deductionItems.values.fold(0, (a, b) => a + b);
-  int get sumFixed => fixedItems.values.fold(0, (a, b) => a + b);
-  int get sumVariable => variableItems.values.fold(0, (a, b) => a + b);
-  int get sumChild => childItems.values.fold(0, (a, b) => a + b);
-  int get totalExp => sumFixed + sumVariable + sumChild + cardExpenses.fold(0, (a, b) => a + b.amount);
+  void _calculateTotal() {
+    totalExp = fixedItems.values.fold(0, (a, b) => a + b);
+  }
 
   String format(int val) => "${nf.format(val)}원";
 
-  Future<void> saveData() async {
+  Future<void> _saveData() async {
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('data', jsonEncode({
-      'income': incomeItems, 'deduction': deductionItems,
-      'fixed': fixedItems, 'variable': variableItems, 'child': childItems,
-      'cards': cardExpenses.map((e) => e.toJson()).toList()
-    }));
+    prefs.setString('data', jsonEncode({'income': incomeItems, 'deduction': deductionItems, 'fixed': fixedItems}));
   }
 
-  Future<void> loadData() async {
+  Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     if (!prefs.containsKey('data')) return;
     final data = jsonDecode(prefs.getString('data')!);
     incomeItems = Map<String, int>.from(data['income']);
     deductionItems = Map<String, int>.from(data['deduction']);
     fixedItems = Map<String, int>.from(data['fixed']);
-    variableItems = Map<String, int>.from(data['variable']);
-    childItems = Map<String, int>.from(data['child'] ?? {});
-    cardExpenses = (data['cards'] as List).map((e) => CardExpense.fromJson(e)).toList();
+    _calculateTotal();
     notifyListeners();
   }
-}
-
-class CardExpense {
-  final String date, desc, card;
-  final int amount;
-  CardExpense({required this.date, required this.desc, required this.card, required this.amount});
-  Map<String, dynamic> toJson() => {'date': date, 'desc': desc, 'card': card, 'amount': amount};
-  factory CardExpense.fromJson(Map<String, dynamic> j) => CardExpense(date: j['date'], desc: j['desc'], card: j['card'], amount: j['amount']);
 }
 
 class MyAccountBookApp extends StatelessWidget {
@@ -82,70 +60,45 @@ class MyAccountBookApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.indigo, useMaterial3: true),
+      theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
       home: const MainHome(),
     );
   }
 }
 
-class MainHome extends StatefulWidget {
+class MainHome extends StatelessWidget {
   const MainHome({super.key});
-  @override State<MainHome> createState() => _MainHomeState();
-}
-
-class _MainHomeState extends State<MainHome> with SingleTickerProviderStateMixin {
-  late TabController _tab;
-  @override void initState() { super.initState(); _tab = TabController(length: 2, vsync: this); }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('💎 나의 가계부'),
-        bottom: TabBar(controller: _tab, tabs: const [Tab(text: '내역 입력'), Tab(text: '통계 요약')]),
-      ),
-      body: TabBarView(controller: _tab, children: [
-        const AccountTab(),
-        const Center(child: Text("통계 화면 준비 중")),
-      ]),
-    );
-  }
-}
-
-class AccountTab extends StatelessWidget {
-  const AccountTab({super.key});
   @override
   Widget build(BuildContext context) {
     final d = context.watch<AccountBookData>();
-    return SingleChildScrollView(
-      child: Column(children: [
-        _listSection("➕ 수입", d.incomeItems, 'income', Colors.blue, d),
-        _listSection("➖ 공제", d.deductionItems, 'deduction', Colors.red, d),
-        _listSection("🏦 고정지출", d.fixedItems, 'fixed', Colors.teal, d),
-        _summaryBox("총 실지출액", d.totalExp, Colors.deepOrange, d),
-      ]),
+    return Scaffold(
+      appBar: AppBar(title: const Text('💎 가계부 v2.0 (초기화본)')),
+      body: SingleChildScrollView(
+        child: Column(children: [
+          _buildSection("➕ 수입", d.incomeItems, 'income', Colors.blue, d),
+          _buildSection("➖ 공제", d.deductionItems, 'deduction', Colors.red, d),
+          _buildSection("🏦 고정지출", d.fixedItems, 'fixed', Colors.teal, d),
+          Container(
+            width: double.infinity, padding: const EdgeInsets.all(20), color: Colors.deepOrange,
+            child: Text("총 지출: ${d.format(d.totalExp)}", style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+          )
+        ]),
+      ),
     );
   }
-}
 
-Widget _listSection(String title, Map<String, int> items, String type, Color color, AccountBookData d) {
-  return Column(children: [
-    Container(width: double.infinity, padding: const EdgeInsets.all(8), color: color.withOpacity(0.1), child: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color))),
-    ...items.keys.map((k) => ListTile(
-      title: Text(k, style: const TextStyle(fontSize: 13)),
-      trailing: SizedBox(width: 100, child: TextField(
-        textAlign: TextAlign.end,
-        keyboardType: TextInputType.number,
-        controller: TextEditingController(text: items[k].toString()),
-        onChanged: (v) => d.updateItem(type, k, int.tryParse(v) ?? 0),
+  Widget _buildSection(String title, Map<String, int> items, String type, Color color, AccountBookData d) {
+    return Column(children: [
+      Container(width: double.infinity, padding: const EdgeInsets.all(10), color: color.withOpacity(0.1), child: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color))),
+      ...items.keys.map((k) => ListTile(
+        title: Text(k),
+        trailing: SizedBox(width: 100, child: TextField(
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.end,
+          controller: TextEditingController(text: items[k].toString()),
+          onChanged: (v) => d.updateItem(type, k, int.tryParse(v) ?? 0),
+        )),
       )),
-    )),
-  ]);
-}
-
-Widget _summaryBox(String label, int val, Color color, AccountBookData d) {
-  return Container(width: double.infinity, padding: const EdgeInsets.all(16), color: color, child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-    Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-    Text(d.format(val), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-  ]));
+    ]);
+  }
 }
