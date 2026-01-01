@@ -12,14 +12,14 @@ jobs:
           channel: 'stable'
           flutter-version: '3.19.0'
       
-      # 꼬인 설정을 초기화하고 새로 만듭니다.
+      # 꼬여있는 기존 안드로이드 폴더를 아예 삭제하고 새로 생성합니다.
       - run: |
           rm -rf android
           flutter create . --platforms=android
       
       - run: flutter pub get
       
-      # 라이브러리 충돌을 해결하는 명령어를 강제로 주입합니다.
+      # 라이브러리 중복 충돌을 해결하기 위한 환경 설정을 강제로 주입합니다.
       - run: |
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
