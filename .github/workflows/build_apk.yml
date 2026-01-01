@@ -7,19 +7,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           flutter-version: '3.19.0'
       
-      # 1. 뼈대를 새로 생성하되 충돌을 방지하는 옵션 적용
-      - run: flutter create . --platforms=android
-      
       - run: flutter pub get
-      
-      # 2. [가장 중요] 중복 클래스 충돌 에러를 강제로 해결하는 옵션을 빌드 시점에 주입합니다.
-      - run: flutter build apk --debug --dart-define=android.useAndroidX=true --dart-define=android.enableJetifier=true
+      - run: flutter build apk --debug
       
       - name: Upload APK
         uses: actions/upload-artifact@v4
