@@ -12,7 +12,7 @@ jobs:
           channel: 'stable'
           flutter-version: '3.19.0'
       
-      # 1. 꼬여있는 기존 안드로이드 설정을 완전히 삭제합니다.
+      # 1. 꼬여있는 기존 안드로이드 폴더를 아예 삭제합니다.
       - run: rm -rf android
       
       # 2. 최신 표준 방식으로 안드로이드 뼈대를 새로 생성합니다. (수동 설정 배제)
@@ -20,7 +20,7 @@ jobs:
       
       - run: flutter pub get
       
-      # 3. 별도의 주입 없이 순수한 표준 빌드를 실행합니다. (중복 클래스 에러 방지)
+      # 3. 별도의 주입 없이 표준 빌드를 실행합니다. (중복 클래스 에러 방지)
       - run: flutter build apk --debug
       
       - name: Upload APK
