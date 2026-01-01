@@ -14,7 +14,7 @@ void main() => runApp(
 class AccountBookData extends ChangeNotifier {
   final NumberFormat nf = NumberFormat('#,###');
 
-  // UI에서 즉시 접근할 수 있도록 모든 언더바(_)를 제거하고 명칭을 맞췄습니다.
+  // UI에서 즉시 접근할 수 있도록 모든 언더바(_)를 제거했습니다.
   Map<String, int> incomeItems = {'기본급': 0, '수당': 0, '성과급': 0};
   Map<String, int> deductionItems = {'갑근세': 0, '주민세': 0, '보험료': 0};
   Map<String, int> fixedItems = {'보험': 133221, '연금': 200000, '청약': 100000, '용돈': 500000};
@@ -102,11 +102,11 @@ class _MainHomeState extends State<MainHome> with SingleTickerProviderStateMixin
     return Scaffold(
       appBar: AppBar(
         title: const Text('💎 가계부'),
-        bottom: TabBar(controller: _tab, tabs: const [Tab(text: '급여/지출'), Tab(text: '카드관리')]),
+        bottom: TabBar(controller: _tab, tabs: const [Tab(text: '내역 입력'), Tab(text: '통계 분석')]),
       ),
       body: TabBarView(controller: _tab, children: [
         const AccountTab(),
-        const Center(child: Text("통계 준비 중")),
+        const Center(child: Text("분석 차트 준비 중")),
       ]),
     );
   }
