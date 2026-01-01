@@ -1,9 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:csv/csv.dart';
+import 'package:share_plus/share_plus.dart';
 
 void main() => runApp(
       ChangeNotifierProvider<AccountBookData>(
@@ -15,7 +19,7 @@ void main() => runApp(
 class AccountBookData extends ChangeNotifier {
   final NumberFormat _nf = NumberFormat('#,###');
 
-  // UI에서 직접 접근할 수 있도록 언더바를 제거했습니다.
+  // UI에서 접근할 수 있도록 언더바를 제거하고 이름을 통일했습니다.
   Map<String, int> incomeItems = {'기본급': 0, '수당': 0, '성과급': 0};
   Map<String, int> deductionItems = {'갑근세': 0, '주민세': 0, '보험료': 0};
   Map<String, int> fixedItems = {'보험': 130000, '연금': 200000, '청약': 100000};
@@ -102,7 +106,7 @@ class _MainHomeState extends State<MainHome> with SingleTickerProviderStateMixin
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('나만의 가계부'),
+        title: const Text('💎 가계부'),
         bottom: TabBar(controller: _tab, tabs: const [Tab(text: '급여'), Tab(text: '지출'), Tab(text: '통계')]),
       ),
       body: TabBarView(controller: _tab, children: [
