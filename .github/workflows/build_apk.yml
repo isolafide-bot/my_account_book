@@ -7,20 +7,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           flutter-version: '3.19.0'
       
-      # [해결책 1] 기존 충돌 설정을 초기화하고 안드로이드 환경을 새로 만듭니다.
+      # 1. 기존 충돌 설정들을 깨끗하게 지우고 안드로이드 환경을 새로 구축합니다.
       - run: |
           rm -rf android
           flutter create . --platforms=android
       
       - run: flutter pub get
       
-      # [해결책 2] 중복 클래스 충돌 방지를 위한 특수 설정을 강제로 주입합니다.
+      # 2. [핵심] 라이브러리 중복 충돌을 방지하는 특수 설정(Jetifier)을 강제로 주입합니다.
       - run: |
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
