@@ -7,17 +7,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          
-      # [핵심 추가] 안드로이드 빌드에 필요한 뼈대 파일을 자동으로 생성합니다.
-      - run: flutter create . --platforms=android
+          flutter-version: '3.19.0'
       
+      # 뼈대를 다시 생성하여 Gradle 에러를 방지합니다.
+      - run: flutter create . --platforms=android
       - run: flutter pub get
       
-      # 에러 방지를 위해 --debug 모드로 먼저 빌드합니다.
+      # 2단/3단 레이아웃이 포함된 복잡한 코드를 위해 debug 모드로 빌드합니다.
       - run: flutter build apk --debug
       
       - name: Upload APK
