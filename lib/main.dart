@@ -19,7 +19,7 @@ void main() => runApp(
 class AccountBookData extends ChangeNotifier {
   final NumberFormat _nf = NumberFormat('#,###');
 
-  // 에러 해결: 언더바(_)를 제거하여 외부에서 접근 가능하게 수정
+  // 화면 코드와 이름을 맞추기 위해 언더바(_)를 제거했습니다.
   Map<String, int> incomeItems = {
     '기본급': 0, '장기근속수당': 0, '시간외근무수당': 0, '가족수당': 0,
     '식대보조비': 0, '대우수당': 0, '직무수행급': 0, '성과급': 0,
@@ -37,10 +37,10 @@ class AccountBookData extends ChangeNotifier {
     '암사동': 300000, '주택청약': 100000, '모임회비': 30000, '용돈': 500000,
   };
   Map<String, int> variableItems = {
-    '십일조': 0, '대출원리금': 0, '연금저축': 0, '식비': 0, '교통비': 0, '관리비': 0,
+    '식비': 0, '교통비': 0, '생필품': 0, '유흥비': 0, '기타': 0,
   };
   Map<String, int> childItems = {
-    '교육비(똘1)': 0, '교육비(똘2)': 0, '기타(자녀)': 0
+    '교육비(똘1)': 0, '교육비(똘2)': 0, '기타(자녀)': 0,
   };
   List<CardExpense> cardExpenses = [];
 
@@ -88,6 +88,21 @@ class AccountBookData extends ChangeNotifier {
     cardExpenses = (data['cards'] as List).map((e) => CardExpense.fromJson(e)).toList();
     notifyListeners();
   }
+
+  Future<void> exportToExcel() async {
+    List<List<dynamic>> rows = [["구분", "항목", "금액"]];
+    incomeItems.forEach((k, v) => rows.add(["수입", k, v]));
+    deductionItems.forEach((k, v) => rows.add(["공제", k, v]));
+    fixedItems.forEach((k, v) => rows.add(["고정", k, v]));
+    variableItems.forEach((k, v) => rows.add(["변동", k, v]));
+    childItems.forEach((k, v) => rows.add(["자녀", k, v]));
+    for (var e in cardExpenses) { rows.add(["카드", e.desc, e.amount]); }
+    String csv = const ListToCsvConverter().convert(rows);
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File("${dir.path}/account_book.csv");
+    await file.writeAsString(csv);
+    await Share.shareXFiles([XFile(file.path)], text: '가계부 엑셀 파일');
+  }
 }
 
 class CardExpense {
@@ -105,7 +120,7 @@ class MyDetailedAccountBook extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.indigo, scaffoldBackgroundColor: Colors.white),
+      theme: ThemeData(primarySwatch: Colors.blueGrey, useMaterial3: true),
       home: const MainHome(),
     );
   }
@@ -123,7 +138,11 @@ class _MainHomeState extends State<MainHome> with SingleTickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('나만의 가계부'), bottom: TabBar(controller: _tab, isScrollable: false, tabs: const [Tab(text: '급여'), Tab(text: '지출'), Tab(text: '카드'), Tab(text: '통계')])),
+      appBar: AppBar(
+        title: const Text('💎 가계부'),
+        actions: [IconButton(icon: const Icon(Icons.file_download), onPressed: () => context.read<AccountBookData>().exportToExcel())],
+        bottom: TabBar(controller: _tab, tabs: const [Tab(text: '급여'), Tab(text: '지출'), Tab(text: '카드'), Tab(text: '통계')]),
+      ),
       body: TabBarView(controller: _tab, children: [const SalaryTab(), const ExpenseTab(), const CardTab(), const StatsTab()]),
     );
   }
@@ -140,7 +159,7 @@ class SalaryTab extends StatelessWidget {
         const VerticalDivider(width: 1),
         Expanded(child: _listBuilder("➖ 공제", d.deductionItems, 'deduction', Colors.red, d)),
       ])),
-      _bottomSummary("실수령액", d.sumIncome - d.sumDeduction, Colors.indigo, d)
+      _summaryBox("실수령액", d.sumIncome - d.sumDeduction, Colors.indigo, d)
     ]);
   }
 }
@@ -161,7 +180,7 @@ class ExpenseTab extends StatelessWidget {
           _miniSum("고정합계", d.sumFixed, d), _miniSum("변동합계", d.sumVariable, d), _miniSum("자녀합계", d.sumChild, d),
         ]),
         const Divider(),
-        _bottomSummary("총 지출액", d.totalExp, Colors.deepOrange, d),
+        _summaryBox("총 지출액", d.totalExp, Colors.deepOrange, d),
       ]))
     ]);
   }
@@ -174,19 +193,15 @@ class CardTab extends StatelessWidget {
     final d = context.watch<AccountBookData>();
     return Column(children: [
       Expanded(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: DataTable(
-        columnSpacing: 12,
-        columns: const [DataColumn(label: Text('연번')), DataColumn(label: Text('일자')), DataColumn(label: Text('카드')), DataColumn(label: Text('내역')), DataColumn(label: Text('금액')), DataColumn(label: Text('회비')), DataColumn(label: Text('비고'))],
+        columns: const [DataColumn(label: Text('연번')), DataColumn(label: Text('카드')), DataColumn(label: Text('내역')), DataColumn(label: Text('금액')), DataColumn(label: Text('회비')), DataColumn(label: Text('비고'))],
         rows: List.generate(d.cardExpenses.length, (i) {
           final e = d.cardExpenses[i];
           return DataRow(cells: [
-            DataCell(Text('${i + 1}')), DataCell(Text(e.date)), DataCell(Text(e.card)), DataCell(Text(e.desc)), DataCell(Text(d.format(e.amount))), DataCell(Text(e.isFee ? '회비' : '일반')), DataCell(Text(e.note)),
+            DataCell(Text('${i + 1}')), DataCell(Text(e.card)), DataCell(Text(e.desc)), DataCell(Text(d.format(e.amount))), DataCell(Text(e.isFee ? 'O' : 'X')), DataCell(Text(e.note)),
           ]);
         }),
       ))),
-      Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: ElevatedButton.icon(onPressed: () => _addCardDialog(context, d), icon: const Icon(Icons.add), label: const Text("카드 지출 추가")),
-      )
+      Padding(padding: const EdgeInsets.all(8), child: ElevatedButton.icon(onPressed: () => _showCardDialog(context, d), icon: const Icon(Icons.add), label: const Text("지출 추가"))),
     ]);
   }
 }
@@ -198,27 +213,25 @@ class StatsTab extends StatelessWidget {
     final d = context.watch<AccountBookData>();
     return Column(children: [
       const SizedBox(height: 20),
-      const Text("📊 지출 비중 분석", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      const Text("📊 지출 비중", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
       Expanded(child: PieChart(PieChartData(sections: [
         PieChartSectionData(color: Colors.teal, value: d.sumFixed.toDouble(), title: '고정', radius: 50),
         PieChartSectionData(color: Colors.orange, value: d.sumVariable.toDouble(), title: '변동', radius: 50),
         PieChartSectionData(color: Colors.purple, value: d.sumChild.toDouble(), title: '자녀', radius: 50),
       ]))),
-      const Center(child: Text("항목별/기간별 필터 기능 준비중", style: TextStyle(color: Colors.grey))),
-      const SizedBox(height: 20),
     ]);
   }
 }
 
 Widget _listBuilder(String title, Map<String, int> items, String type, Color color, AccountBookData d) {
   return Column(children: [
-    Container(width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 6), color: color.withOpacity(0.1), child: Text(title, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 13))),
+    Container(width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 4), color: color.withOpacity(0.1), child: Text(title, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 12))),
     Expanded(child: ListView(padding: const EdgeInsets.all(4), children: items.keys.map((k) => Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: TextField(
-        decoration: InputDecoration(labelText: k, isDense: true, contentPadding: const EdgeInsets.all(8), border: const OutlineInputBorder(), suffixText: '원'),
+        decoration: InputDecoration(labelText: k, isDense: true, contentPadding: const EdgeInsets.all(6), border: const OutlineInputBorder(), suffixText: '원'),
         keyboardType: TextInputType.number,
-        style: const TextStyle(fontSize: 11),
+        style: const TextStyle(fontSize: 10),
         controller: TextEditingController(text: items[k].toString()),
         onChanged: (v) => d.updateItem(type, k, int.tryParse(v) ?? 0),
       ),
@@ -226,7 +239,7 @@ Widget _listBuilder(String title, Map<String, int> items, String type, Color col
   ]);
 }
 
-Widget _bottomSummary(String label, int val, Color color, AccountBookData d) {
+Widget _summaryBox(String label, int val, Color color, AccountBookData d) {
   return Container(width: double.infinity, padding: const EdgeInsets.all(12), color: color, child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
     Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
     Text(d.format(val), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
@@ -234,21 +247,20 @@ Widget _bottomSummary(String label, int val, Color color, AccountBookData d) {
 }
 
 Widget _miniSum(String label, int val, AccountBookData d) {
-  return Column(children: [Text(label, style: const TextStyle(fontSize: 10)), Text(d.format(val), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12))]);
+  return Column(children: [Text(label, style: const TextStyle(fontSize: 10)), Text(d.format(val), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11))]);
 }
 
-void _addCardDialog(BuildContext context, AccountBookData d) {
-  String date = DateFormat('MM/dd').format(DateTime.now()), desc = "", card = "우리카드", note = "";
-  int amount = 0; bool isFee = false;
+void _showCardDialog(BuildContext context, AccountBookData d) {
+  String desc = "", card = "우리카드", note = ""; int amount = 0; bool isFee = false;
   showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
-    title: const Text("카드 지출 추가"),
+    title: const Text("카드 지출"),
     content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
       DropdownButton<String>(isExpanded: true, value: card, items: ["우리카드", "현대카드", "KB카드", "LG카드", "삼성카드", "신한카드"].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setS(() => card = v!)),
       TextField(decoration: const InputDecoration(labelText: "내역"), onChanged: (v) => desc = v),
       TextField(decoration: const InputDecoration(labelText: "금액"), keyboardType: TextInputType.number, onChanged: (v) => amount = int.tryParse(v) ?? 0),
-      TextField(decoration: const InputDecoration(labelText: "비고(메모)"), onChanged: (v) => note = v),
+      TextField(decoration: const InputDecoration(labelText: "비고"), onChanged: (v) => note = v),
       CheckboxListTile(title: const Text("회비 여부"), value: isFee, onChanged: (v) => setS(() => isFee = v!)),
     ])),
-    actions: [TextButton(onPressed: () { d.addCardExpense(CardExpense(date: date, desc: desc, card: card, amount: amount, isFee: isFee, note: note)); Navigator.pop(ctx); }, child: const Text("저장"))],
+    actions: [TextButton(onPressed: () { d.addCardExpense(CardExpense(date: "", desc: desc, card: card, amount: amount, isFee: isFee, note: note)); Navigator.pop(ctx); }, child: const Text("저장"))],
   )));
 }
