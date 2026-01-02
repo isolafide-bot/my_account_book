@@ -66,7 +66,16 @@ class AccountData extends ChangeNotifier {
   String f(num v) => "${nf.format(v)}원";
   int get sInc => income.values.fold(0, (a, b) => a + b);
   int get sDed => deduction.values.fold(0, (a, b) => a + b);
-  int get sExp => fixedExp.values.fold(0, (a,b)=>a+b) + variableExp.values.fold(0,(a,b)=>a+b) + childExp.values.fold(0,(a,b)=>a+b) + cardLogs.fold(0,(a,b)=>a+(b['amt'] as int));
+
+  // 오류가 발생했던 합계 계산 부분을 명확한 int 타입으로 수정했습니다.
+  int get sExp {
+    int total = 0;
+    total += fixedExp.values.fold(0, (a, b) => a + b);
+    total += variableExp.values.fold(0, (a, b) => a + b);
+    total += childExp.values.fold(0, (a, b) => a + b);
+    total += cardLogs.fold(0, (a, b) => a + (b['amt'] as int));
+    return total;
+  }
 }
 
 class MyPremiumApp extends StatelessWidget {
