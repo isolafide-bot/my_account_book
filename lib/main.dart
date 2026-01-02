@@ -67,30 +67,22 @@ class AccountData extends ChangeNotifier {
     prefs.setString('account_final_v1', jsonEncode(storage));
   }
 
-  // 오류가 발생했던 엑셀 저장 로직을 최신 문법(v4.0+)으로 전면 수정했습니다.
+  // 엑셀 저장 최신 문법(v4.x) 완벽 적용
   Future<void> exportToExcel() async {
     var excel = Excel.createExcel();
-    String sheetName = "Account_$selectedMonth";
-    Sheet sheetObject = excel[sheetName];
-    excel.delete('Sheet1');
+    Sheet sheet = excel[excel.getDefaultSheet()!];
 
-    // 헤더 추가 (TextCellValue 사용)
-    sheetObject.appendRow([
-      TextCellValue('항목구분'),
-      TextCellValue('항목명'),
-      TextCellValue('금액(원)')
-    ]);
-
-    // 데이터 추가 (타입별 CellValue 사용)
-    income.forEach((k, v) => sheetObject.appendRow([TextCellValue('수입'), TextCellValue(k), IntCellValue(v)]));
-    deduction.forEach((k, v) => sheetObject.appendRow([TextCellValue('공제'), TextCellValue(k), IntCellValue(v)]));
-    fixedExp.forEach((k, v) => sheetObject.appendRow([TextCellValue('고정지출'), TextCellValue(k), IntCellValue(v)]));
-    variableExp.forEach((k, v) => sheetObject.appendRow([TextCellValue('변동지출'), TextCellValue(k), IntCellValue(v)]));
-    childExp.forEach((k, v) => sheetObject.appendRow([TextCellValue('자녀지출'), TextCellValue(k), IntCellValue(v)]));
+    // 데이터 삽입 시 TextCellValue, IntCellValue 상자를 사용해야 합니다.
+    sheet.appendRow([TextCellValue('항목구분'), TextCellValue('항목명'), TextCellValue('금액')]);
     
-    // 카드 내역 추가
+    income.forEach((k, v) => sheet.appendRow([TextCellValue('수입'), TextCellValue(k), IntCellValue(v)]));
+    deduction.forEach((k, v) => sheet.appendRow([TextCellValue('공제'), TextCellValue(k), IntCellValue(v)]));
+    fixedExp.forEach((k, v) => sheet.appendRow([TextCellValue('고정지출'), TextCellValue(k), IntCellValue(v)]));
+    variableExp.forEach((k, v) => sheet.appendRow([TextCellValue('변동지출'), TextCellValue(k), IntCellValue(v)]));
+    childExp.forEach((k, v) => sheet.appendRow([TextCellValue('자녀지출'), TextCellValue(k), IntCellValue(v)]));
+    
     for (var log in cardLogs) {
-      sheetObject.appendRow([TextCellValue('카드'), TextCellValue("${log['desc']} (${log['card']})"), IntCellValue(log['amt'])]);
+      sheet.appendRow([TextCellValue('카드'), TextCellValue("${log['desc']} (${log['card']})"), IntCellValue(log['amt'])]);
     }
     
     final directory = await getTemporaryDirectory();
@@ -148,7 +140,7 @@ class _MainScaffoldState extends State<MainScaffold> with SingleTickerProviderSt
           },
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.file_download), onPressed: () => d.exportToExcel(), tooltip: '엑셀 저장'),
+          IconButton(icon: const Icon(Icons.file_download), onPressed: () => d.exportToExcel()),
         ],
         bottom: TabBar(controller: _tab, tabs: const [Tab(text: "수입"), Tab(text: "지출"), Tab(text: "카드"), Tab(text: "통계")]),
       ),
