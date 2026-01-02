@@ -13,6 +13,23 @@ dependencies:
   intl: ^0.19.0
   shared_preferences: ^2.2.2
   fl_chart: ^0.66.0
+  # 엑셀 및 파일 공유 기능 추가
+  excel: ^4.0.0
+  path_provider: ^2.1.2
+  share_plus: ^7.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  # 아이콘 자동 생성 도구
+  flutter_launcher_icons: ^0.13.1
+
+# 아이콘 설정 (앱바 디자인과 맞춘 인디고 테마 아이콘)
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png" # 임시 경로 (빌드 에러 방지를 위해 설정만 유지)
 
 flutter:
   uses-material-design: true
