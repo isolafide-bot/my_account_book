@@ -13,10 +13,10 @@ dependencies:
   intl: ^0.19.0
   shared_preferences: ^2.2.2
   fl_chart: ^0.66.0
-  # 충돌 방지를 위해 안정 버전으로 명시
-  excel: 4.0.3
+  # 버전 충돌을 피하기 위해 가장 많이 검증된 버전으로 변경
+  excel: 2.1.0  
   path_provider: ^2.1.2
-  share_plus: ^7.2.1
+  share_plus: ^7.0.0
 
 flutter:
   uses-material-design: true
