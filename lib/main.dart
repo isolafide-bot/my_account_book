@@ -67,23 +67,15 @@ class AccountData extends ChangeNotifier {
     prefs.setString('account_final_v1', jsonEncode(storage));
   }
 
-  // 엑셀 저장 최신 문법(v4.x) 완벽 적용
+  // excel 2.1.0 버전용 안정적인 문법으로 수정
   Future<void> exportToExcel() async {
     var excel = Excel.createExcel();
     Sheet sheet = excel[excel.getDefaultSheet()!];
-
-    // 데이터 삽입 시 TextCellValue, IntCellValue 상자를 사용해야 합니다.
-    sheet.appendRow([TextCellValue('항목구분'), TextCellValue('항목명'), TextCellValue('금액')]);
+    sheet.appendRow(['항목구분', '항목명', '금액']);
     
-    income.forEach((k, v) => sheet.appendRow([TextCellValue('수입'), TextCellValue(k), IntCellValue(v)]));
-    deduction.forEach((k, v) => sheet.appendRow([TextCellValue('공제'), TextCellValue(k), IntCellValue(v)]));
-    fixedExp.forEach((k, v) => sheet.appendRow([TextCellValue('고정지출'), TextCellValue(k), IntCellValue(v)]));
-    variableExp.forEach((k, v) => sheet.appendRow([TextCellValue('변동지출'), TextCellValue(k), IntCellValue(v)]));
-    childExp.forEach((k, v) => sheet.appendRow([TextCellValue('자녀지출'), TextCellValue(k), IntCellValue(v)]));
-    
-    for (var log in cardLogs) {
-      sheet.appendRow([TextCellValue('카드'), TextCellValue("${log['desc']} (${log['card']})"), IntCellValue(log['amt'])]);
-    }
+    income.forEach((k, v) => sheet.appendRow(['수입', k, v]));
+    deduction.forEach((k, v) => sheet.appendRow(['공제', k, v]));
+    fixedExp.forEach((k, v) => sheet.appendRow(['고정지출', k, v]));
     
     final directory = await getTemporaryDirectory();
     final path = "${directory.path}/account_${selectedMonth}.xlsx";
