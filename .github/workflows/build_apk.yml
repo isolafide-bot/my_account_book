@@ -1,4 +1,4 @@
-name: Build APK (Fresh Start)
+name: Build APK (Clean Start)
 on:
   push:
     branches: [ "main" ]
@@ -10,21 +10,18 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          flutter-version: '3.19.0' # 가장 검증된 안정 버전 사용
+          flutter-version: '3.19.0'
       
-      # [핵심] 기존에 생성된 android 폴더와 설정들을 완전히 삭제하여 백지상태로 만듭니다.
-      - run: rm -rf android
-      
-      # [핵심] 현재 Flutter 버전에 맞는 가장 깨끗한 안드로이드 뼈대를 새로 생성합니다.
-      - run: flutter create . --platforms=android
+      # [핵심] 꼬여있는 안드로이드 설정을 완전히 삭제하고 초기화합니다.
+      - run: |
+          rm -rf android
+          flutter create . --platforms=android
       
       - run: flutter pub get
-      
-      # 별도의 수동 설정 주입 없이 Flutter의 표준 빌드 프로세스만 가동합니다.
       - run: flutter build apk --debug
       
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: my-account-book-v2
+          name: my-new-account-book
           path: build/app/outputs/flutter-apk/app-debug.apk
