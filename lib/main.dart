@@ -1,9 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:excel/excel.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 void main() => runApp(
       ChangeNotifierProvider<AccountData>(
@@ -63,18 +67,34 @@ class AccountData extends ChangeNotifier {
     prefs.setString('account_final_v1', jsonEncode(storage));
   }
 
-  String f(num v) => "${nf.format(v)}원";
+  // 엑셀 내보내기 로직
+  Future<void> exportToExcel() async {
+    var excel = Excel.createExcel();
+    Sheet sheet = excel['Account_${selectedMonth}'];
+    excel.delete('Sheet1');
+
+    sheet.appendRow(['항목구분', '항목명', '금액']);
+    income.forEach((k, v) => sheet.appendRow(['수입', k, v]));
+    deduction.forEach((k, v) => sheet.appendRow(['공제', k, v]));
+    fixedExp.forEach((k, v) => sheet.appendRow(['고정지출', k, v]));
+    
+    final directory = await getTemporaryDirectory();
+    final path = "${directory.path}/account_${selectedMonth}.xlsx";
+    final file = File(path);
+    await file.writeAsBytes(excel.encode()!);
+    await Share.shareXFiles([XFile(path)], text: '${selectedMonth} 가계부 내역');
+  }
+
+  String f(num v) => nf.format(v);
   int get sInc => income.values.fold(0, (a, b) => a + b);
   int get sDed => deduction.values.fold(0, (a, b) => a + b);
-
-  // 오류가 발생했던 합계 계산 부분을 명확한 int 타입으로 수정했습니다.
   int get sExp {
-    int total = 0;
-    total += fixedExp.values.fold(0, (a, b) => a + b);
-    total += variableExp.values.fold(0, (a, b) => a + b);
-    total += childExp.values.fold(0, (a, b) => a + b);
-    total += cardLogs.fold(0, (a, b) => a + (b['amt'] as int));
-    return total;
+    int t = 0;
+    t += fixedExp.values.fold(0, (a,b)=>a+b);
+    t += variableExp.values.fold(0, (a,b)=>a+b);
+    t += childExp.values.fold(0, (a,b)=>a+b);
+    t += cardLogs.fold(0, (a,b)=>a+(b['amt'] as int));
+    return t;
   }
 }
 
@@ -105,13 +125,16 @@ class _MainScaffoldState extends State<MainScaffold> with SingleTickerProviderSt
     return Scaffold(
       appBar: AppBar(
         title: ActionChip(
-          avatar: const Icon(Icons.calendar_month),
+          avatar: const Icon(Icons.calendar_month, size: 18),
           label: Text(d.selectedMonth, style: const TextStyle(fontWeight: FontWeight.bold)),
           onPressed: () async {
             DateTime? p = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2024), lastDate: DateTime(2030));
             if (p != null) d.loadMonth(DateFormat('yyyy-MM').format(p));
           },
         ),
+        actions: [
+          IconButton(icon: const Icon(Icons.file_download), onPressed: () => d.exportToExcel(), tooltip: '엑셀 저장'),
+        ],
         bottom: TabBar(controller: _tab, tabs: const [Tab(text: "수입"), Tab(text: "지출"), Tab(text: "카드"), Tab(text: "통계")]),
       ),
       body: TabBarView(controller: _tab, children: [const TabInc(), const TabExp(), const TabCard(), const TabChart()]),
@@ -130,11 +153,11 @@ class TabInc extends StatelessWidget {
         const VerticalDivider(width: 1),
         Expanded(child: _list("공제 내역", d.deduction, 'ded', Colors.redAccent, d)),
       ])),
-      Container(padding: const EdgeInsets.all(12), color: Colors.indigo.withOpacity(0.05), child: Column(children: [
-        _row("세전 총액", d.sInc, Colors.blue),
-        _row("공제 총액", d.sDed, Colors.red),
-        const Divider(),
-        _row("세후 수입금액", d.sInc - d.sDed, Colors.indigo, b: true),
+      Container(padding: const EdgeInsets.all(8), color: Colors.indigo.withOpacity(0.05), child: Column(children: [
+        _row("세전", d.sInc, Colors.blue),
+        _row("공제", d.sDed, Colors.red),
+        const Divider(height: 10),
+        _row("실수령", d.sInc - d.sDed, Colors.indigo, b: true),
       ]))
     ]);
   }
@@ -149,9 +172,9 @@ class TabExp extends StatelessWidget {
       Expanded(child: Row(children: [
         Expanded(child: _list("고정지출", d.fixedExp, 'fix', Colors.teal, d)),
         Expanded(child: _list("변동지출", d.variableExp, 'var', Colors.orange, d)),
-        Expanded(child: _list("변동(자녀)", d.childExp, 'chi', Colors.purple, d)),
+        Expanded(child: _list("자녀", d.childExp, 'chi', Colors.purple, d)),
       ])),
-      _row("지출 총 합계", d.sExp, Colors.deepOrange, b: true),
+      _row("지출 합계", d.sExp, Colors.deepOrange, b: true),
     ]);
   }
 }
@@ -162,20 +185,26 @@ class TabCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final d = context.watch<AccountData>();
     return Scaffold(
-      floatingActionButton: FloatingActionButton(onPressed: () => _addCardDlg(context, d), child: const Icon(Icons.add)),
-      body: ListView.builder(
+      floatingActionButton: FloatingActionButton.small(onPressed: () => _addCardDlg(context, d), child: const Icon(Icons.add)),
+      body: ListView.separated(
         itemCount: d.cardLogs.length,
+        separatorBuilder: (context, index) => const Divider(height: 1),
         itemBuilder: (ctx, i) {
           final log = d.cardLogs[i];
-          return Card(margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), child: ListTile(
-            leading: CircleAvatar(child: Text("${i+1}")),
-            title: Text("${log['desc']} (${log['card']})"),
-            subtitle: Text("${log['date']} | ${log['club'] ? '회비O' : '회비X'}\n비고: ${log['note']}"),
-            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-              Text(d.f(log['amt']), style: const TextStyle(fontWeight: FontWeight.bold)),
-              IconButton(icon: const Icon(Icons.delete, color: Colors.grey), onPressed: () => d.delCard(i)),
-            ]),
-          ));
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              children: [
+                Text("${i+1}", style: const TextStyle(fontSize: 10, color: Colors.grey)), // 연번 크기 대폭 축소
+                const SizedBox(width: 10),
+                Expanded(child: Text("${log['date'].toString().substring(5)} | ${log['desc']} | ${log['card']}", 
+                  style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+                Text(d.nf.format(log['amt']), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                const Text("원", style: TextStyle(fontSize: 10)),
+                IconButton(icon: const Icon(Icons.close, size: 16, color: Colors.red), onPressed: () => d.delCard(i)),
+              ],
+            ),
+          );
         },
       ),
     );
@@ -205,21 +234,23 @@ class _TabChartState extends State<TabChart> {
       ),
       const SizedBox(height: 30),
       Expanded(child: BarChart(BarChartData(barGroups: groups, borderData: FlBorderData(show: false)))),
-      const Text("항목별 월별 현황"),
+      const Text("항목별 현황 (금액 기준)"),
     ]));
   }
 }
 
+// 디자인 수정: 칸 높이 축소, 금액 포인트 확대
 Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d) {
   return Column(children: [
-    Container(padding: const EdgeInsets.all(4), color: c.withOpacity(0.1), width: double.infinity, child: Text(t, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 12))),
-    Expanded(child: ListView(padding: const EdgeInsets.all(4), children: data.keys.map((k) => Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+    Container(padding: const EdgeInsets.symmetric(vertical: 2), color: c.withOpacity(0.1), width: double.infinity, child: Text(t, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 11))),
+    Expanded(child: ListView(padding: const EdgeInsets.all(2), children: data.keys.map((k) => Container(
+      height: 38, // 칸 높이 줄임
+      margin: const EdgeInsets.only(bottom: 2),
       child: TextField(
         textAlign: TextAlign.right,
         keyboardType: TextInputType.number,
-        decoration: InputDecoration(labelText: k, isDense: true, border: const OutlineInputBorder(), suffixText: '원'),
-        style: const TextStyle(fontSize: 10),
+        decoration: InputDecoration(labelText: k, labelStyle: const TextStyle(fontSize: 10), isDense: true, border: const OutlineInputBorder(), suffixText: '원'),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold), // 금액 포인트 키움
         controller: TextEditingController(text: d.nf.format(data[k])),
         onSubmitted: (v) => d.updateVal(cat, k, int.tryParse(v.replaceAll(',', '')) ?? 0),
       ),
@@ -228,16 +259,16 @@ Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d
 }
 
 Widget _row(String l, int v, Color c, {bool b = false}) {
-  return Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-    Text(l, style: TextStyle(color: c, fontWeight: b ? FontWeight.bold : null)),
-    Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b ? 15 : 13)),
-  ]));
+  return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+    Text(l, style: TextStyle(color: c, fontWeight: b ? FontWeight.bold : null, fontSize: 12)),
+    Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b ? 18 : 15)), // 합계 금액 강조
+  ]);
 }
 
 void _addCardDlg(BuildContext context, AccountData d) {
   String card = "우리카드"; String desc = ""; int amt = 0; bool club = false; String note = "";
   showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
-    title: const Text("카드 사용 내역 추가"),
+    title: const Text("카드 추가", style: TextStyle(fontSize: 16)),
     content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
       DropdownButton<String>(isExpanded: true, value: card, items: ["우리카드","현대카드","KB카드","LG카드","삼성카드","신한카드"].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setS(() => card = v!)),
       TextField(decoration: const InputDecoration(labelText: "내역"), onChanged: (v) => desc = v),
