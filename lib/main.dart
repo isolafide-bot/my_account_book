@@ -67,16 +67,31 @@ class AccountData extends ChangeNotifier {
     prefs.setString('account_final_v1', jsonEncode(storage));
   }
 
-  // 엑셀 내보내기 로직
+  // 오류가 발생했던 엑셀 저장 로직을 최신 문법(v4.0+)으로 전면 수정했습니다.
   Future<void> exportToExcel() async {
     var excel = Excel.createExcel();
-    Sheet sheet = excel['Account_${selectedMonth}'];
+    String sheetName = "Account_$selectedMonth";
+    Sheet sheetObject = excel[sheetName];
     excel.delete('Sheet1');
 
-    sheet.appendRow(['항목구분', '항목명', '금액']);
-    income.forEach((k, v) => sheet.appendRow(['수입', k, v]));
-    deduction.forEach((k, v) => sheet.appendRow(['공제', k, v]));
-    fixedExp.forEach((k, v) => sheet.appendRow(['고정지출', k, v]));
+    // 헤더 추가 (TextCellValue 사용)
+    sheetObject.appendRow([
+      TextCellValue('항목구분'),
+      TextCellValue('항목명'),
+      TextCellValue('금액(원)')
+    ]);
+
+    // 데이터 추가 (타입별 CellValue 사용)
+    income.forEach((k, v) => sheetObject.appendRow([TextCellValue('수입'), TextCellValue(k), IntCellValue(v)]));
+    deduction.forEach((k, v) => sheetObject.appendRow([TextCellValue('공제'), TextCellValue(k), IntCellValue(v)]));
+    fixedExp.forEach((k, v) => sheetObject.appendRow([TextCellValue('고정지출'), TextCellValue(k), IntCellValue(v)]));
+    variableExp.forEach((k, v) => sheetObject.appendRow([TextCellValue('변동지출'), TextCellValue(k), IntCellValue(v)]));
+    childExp.forEach((k, v) => sheetObject.appendRow([TextCellValue('자녀지출'), TextCellValue(k), IntCellValue(v)]));
+    
+    // 카드 내역 추가
+    for (var log in cardLogs) {
+      sheetObject.appendRow([TextCellValue('카드'), TextCellValue("${log['desc']} (${log['card']})"), IntCellValue(log['amt'])]);
+    }
     
     final directory = await getTemporaryDirectory();
     final path = "${directory.path}/account_${selectedMonth}.xlsx";
@@ -195,7 +210,7 @@ class TabCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Row(
               children: [
-                Text("${i+1}", style: const TextStyle(fontSize: 10, color: Colors.grey)), // 연번 크기 대폭 축소
+                Text("${i+1}", style: const TextStyle(fontSize: 10, color: Colors.grey)), 
                 const SizedBox(width: 10),
                 Expanded(child: Text("${log['date'].toString().substring(5)} | ${log['desc']} | ${log['card']}", 
                   style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
@@ -239,18 +254,17 @@ class _TabChartState extends State<TabChart> {
   }
 }
 
-// 디자인 수정: 칸 높이 축소, 금액 포인트 확대
 Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d) {
   return Column(children: [
     Container(padding: const EdgeInsets.symmetric(vertical: 2), color: c.withOpacity(0.1), width: double.infinity, child: Text(t, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 11))),
     Expanded(child: ListView(padding: const EdgeInsets.all(2), children: data.keys.map((k) => Container(
-      height: 38, // 칸 높이 줄임
+      height: 38,
       margin: const EdgeInsets.only(bottom: 2),
       child: TextField(
         textAlign: TextAlign.right,
         keyboardType: TextInputType.number,
         decoration: InputDecoration(labelText: k, labelStyle: const TextStyle(fontSize: 10), isDense: true, border: const OutlineInputBorder(), suffixText: '원'),
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold), // 금액 포인트 키움
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
         controller: TextEditingController(text: d.nf.format(data[k])),
         onSubmitted: (v) => d.updateVal(cat, k, int.tryParse(v.replaceAll(',', '')) ?? 0),
       ),
@@ -261,7 +275,7 @@ Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d
 Widget _row(String l, int v, Color c, {bool b = false}) {
   return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
     Text(l, style: TextStyle(color: c, fontWeight: b ? FontWeight.bold : null, fontSize: 12)),
-    Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b ? 18 : 15)), // 합계 금액 강조
+    Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b ? 18 : 15)),
   ]);
 }
 
