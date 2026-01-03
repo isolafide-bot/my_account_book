@@ -74,7 +74,6 @@ class AccountData extends ChangeNotifier {
     income.forEach((k, v) => sheet.appendRow(['수입', k, v]));
     deduction.forEach((k, v) => sheet.appendRow(['공제', k, v]));
     fixedExp.forEach((k, v) => sheet.appendRow(['고정지출', k, v]));
-    
     final directory = await getTemporaryDirectory();
     final path = "${directory.path}/account_${selectedMonth}.xlsx";
     final file = File(path);
@@ -129,9 +128,7 @@ class _MainScaffoldState extends State<MainScaffold> with SingleTickerProviderSt
             if (p != null) d.loadMonth(DateFormat('yyyy-MM').format(p));
           },
         ),
-        actions: [
-          IconButton(icon: const Icon(Icons.file_download), onPressed: () => d.exportToExcel()),
-        ],
+        actions: [IconButton(icon: const Icon(Icons.file_download), onPressed: () => d.exportToExcel())],
         bottom: TabBar(controller: _tab, tabs: const [Tab(text: "수입"), Tab(text: "지출"), Tab(text: "카드"), Tab(text: "통계")]),
       ),
       body: TabBarView(controller: _tab, children: [const TabInc(), const TabExp(), const TabCard(), const TabChart()]),
@@ -151,10 +148,8 @@ class TabInc extends StatelessWidget {
         Expanded(child: _list("공제 내역", d.deduction, 'ded', Colors.redAccent, d)),
       ])),
       Container(padding: const EdgeInsets.all(8), color: Colors.indigo.withOpacity(0.05), child: Column(children: [
-        _row("세전", d.sInc, Colors.blue),
-        _row("공제", d.sDed, Colors.red),
-        const Divider(height: 10),
-        _row("실수령", d.sInc - d.sDed, Colors.indigo, b: true),
+        _row("세전", d.sInc, Colors.blue), _row("공제", d.sDed, Colors.red),
+        const Divider(height: 10), _row("실수령", d.sInc - d.sDed, Colors.indigo, b: true),
       ]))
     ]);
   }
@@ -185,23 +180,17 @@ class TabCard extends StatelessWidget {
       floatingActionButton: FloatingActionButton.small(onPressed: () => _addCardDlg(context, d), child: const Icon(Icons.add)),
       body: ListView.separated(
         itemCount: d.cardLogs.length,
-        separatorBuilder: (context, index) => const Divider(height: 1),
+        separatorBuilder: (ctx, i) => const Divider(height: 1),
         itemBuilder: (ctx, i) {
           final log = d.cardLogs[i];
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Row(
-              children: [
-                Text("${i+1}", style: const TextStyle(fontSize: 10, color: Colors.grey)), 
-                const SizedBox(width: 10),
-                Expanded(child: Text("${log['date'].toString().substring(5)} | ${log['desc']} | ${log['card']}", 
-                  style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
-                Text(d.nf.format(log['amt']), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.indigo)),
-                const Text("원", style: TextStyle(fontSize: 10)),
-                IconButton(icon: const Icon(Icons.close, size: 16, color: Colors.red), onPressed: () => d.delCard(i)),
-              ],
-            ),
-          );
+          return Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8), child: Row(children: [
+            Text("${i+1}", style: const TextStyle(fontSize: 9, color: Colors.grey)), // 연번 축소
+            const SizedBox(width: 8),
+            Expanded(child: Text("${log['date'].toString().substring(5)} | ${log['desc']} | ${log['card']}", style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+            Text(d.nf.format(log['amt']), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.indigo)),
+            const Text("원", style: TextStyle(fontSize: 10)),
+            IconButton(icon: const Icon(Icons.close, size: 16, color: Colors.red), onPressed: () => d.delCard(i)),
+          ]));
         },
       ),
     );
@@ -222,15 +211,9 @@ class _TabChartState extends State<TabChart> {
     Map<String, int> data = mode == "급여" ? d.income : (mode == "지출" ? d.fixedExp : {});
     int i = 0;
     data.forEach((k, v) { if(v > 0) groups.add(BarChartGroupData(x: i++, barRods: [BarChartRodData(toY: v.toDouble(), color: Colors.indigo, width: 14)])); });
-
     return Padding(padding: const EdgeInsets.all(20), child: Column(children: [
-      SegmentedButton<String>(
-        segments: const [ButtonSegment(value: "급여", label: Text("급여")), ButtonSegment(value: "지출", label: Text("지출"))],
-        selected: {mode},
-        onSelectionChanged: (s) => setState(() => mode = s.first),
-      ),
-      const SizedBox(height: 30),
-      Expanded(child: BarChart(BarChartData(barGroups: groups, borderData: FlBorderData(show: false)))),
+      SegmentedButton<String>(segments: const [ButtonSegment(value: "급여", label: Text("급여")), ButtonSegment(value: "지출", label: Text("지출"))], selected: {mode}, onSelectionChanged: (s) => setState(() => mode = s.first)),
+      const SizedBox(height: 30), Expanded(child: BarChart(BarChartData(barGroups: groups, borderData: FlBorderData(show: false)))),
       const Text("항목별 현황 (금액 기준)"),
     ]));
   }
@@ -238,15 +221,13 @@ class _TabChartState extends State<TabChart> {
 
 Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d) {
   return Column(children: [
-    Container(padding: const EdgeInsets.symmetric(vertical: 2), color: c.withOpacity(0.1), width: double.infinity, child: Text(t, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 11))),
+    Container(padding: const EdgeInsets.symmetric(vertical: 2), color: c.withOpacity(0.1), width: double.infinity, child: Text(t, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 10))),
     Expanded(child: ListView(padding: const EdgeInsets.all(2), children: data.keys.map((k) => Container(
-      height: 38,
-      margin: const EdgeInsets.only(bottom: 2),
+      height: 38, margin: const EdgeInsets.only(bottom: 2),
       child: TextField(
-        textAlign: TextAlign.right,
-        keyboardType: TextInputType.number,
-        decoration: InputDecoration(labelText: k, labelStyle: const TextStyle(fontSize: 10), isDense: true, border: const OutlineInputBorder(), suffixText: '원'),
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+        textAlign: TextAlign.right, keyboardType: TextInputType.number,
+        decoration: InputDecoration(labelText: k, labelStyle: const TextStyle(fontSize: 9), isDense: true, border: const OutlineInputBorder(), suffixText: '원'),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold), // 금액 확대
         controller: TextEditingController(text: d.nf.format(data[k])),
         onSubmitted: (v) => d.updateVal(cat, k, int.tryParse(v.replaceAll(',', '')) ?? 0),
       ),
@@ -256,8 +237,8 @@ Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d
 
 Widget _row(String l, int v, Color c, {bool b = false}) {
   return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-    Text(l, style: TextStyle(color: c, fontWeight: b ? FontWeight.bold : null, fontSize: 12)),
-    Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b ? 18 : 15)),
+    Text(l, style: TextStyle(color: c, fontWeight: b ? FontWeight.bold : null, fontSize: 11)),
+    Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b ? 18 : 14)),
   ]);
 }
 
@@ -269,7 +250,6 @@ void _addCardDlg(BuildContext context, AccountData d) {
       DropdownButton<String>(isExpanded: true, value: card, items: ["우리카드","현대카드","KB카드","LG카드","삼성카드","신한카드"].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setS(() => card = v!)),
       TextField(decoration: const InputDecoration(labelText: "내역"), onChanged: (v) => desc = v),
       TextField(decoration: const InputDecoration(labelText: "금액"), keyboardType: TextInputType.number, onChanged: (v) => amt = int.tryParse(v) ?? 0),
-      TextField(decoration: const InputDecoration(labelText: "비고"), onChanged: (v) => note = v),
       SwitchListTile(title: const Text("회비여부"), value: club, onChanged: (v) => setS(() => club = v)),
     ])),
     actions: [TextButton(onPressed: () { d.addCard({'date': DateFormat('yyyy-MM-dd').format(DateTime.now()), 'desc': desc, 'amt': amt, 'card': card, 'club': club, 'note': note}); Navigator.pop(ctx); }, child: const Text("저장"))],
