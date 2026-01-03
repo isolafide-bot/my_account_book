@@ -15,9 +15,9 @@ void main() => runApp(
 class AccountData extends ChangeNotifier {
   final nf = NumberFormat('#,###');
   String selectedMonth = DateFormat('yyyy-MM').format(DateTime.now());
+  String selectedYear = DateFormat('yyyy').format(DateTime.now());
   Map<String, dynamic> storage = {};
 
-  // 데이터 구조
   Map<String, int> income = {};
   Map<String, int> deduction = {};
   Map<String, int> fixedExp = {};
@@ -26,15 +26,13 @@ class AccountData extends ChangeNotifier {
   List<Map<String, dynamic>> cardLogs = [];
   List<Map<String, dynamic>> savingsHistory = [];
   int savingsGoal = 64000000;
-  
-  // 통계 선택용
-  Set<String> selectedStatsItems = {'기본급', '고정지출'};
+  Set<String> selectedStatsItems = {'기본급'};
 
   AccountData() { _init(); }
 
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
-    String? raw = prefs.getString('ultimate_pro_v40');
+    String? raw = prefs.getString('ultimate_master_v50');
     if (raw != null) storage = jsonDecode(raw);
     savingsGoal = storage['savingsGoal'] ?? 64000000;
     loadMonth(selectedMonth);
@@ -43,11 +41,11 @@ class AccountData extends ChangeNotifier {
   void loadMonth(String month) {
     selectedMonth = month;
     var d = storage[month] ?? {};
-    income = Map<String, int>.from(d['income'] ?? {'기본급':0,'수당':0,'성과급':0});
-    deduction = Map<String, int>.from(d['deduction'] ?? {'세금':0,'보험료':0});
-    fixedExp = Map<String, int>.from(d['fixedExp'] ?? {'보험':0,'주거':0});
-    variableExp = Map<String, int>.from(d['variableExp'] ?? {'식비':0,'교통':0});
-    childExp = Map<String, int>.from(d['childExp'] ?? {'교육':0,'자녀주식':0});
+    income = Map<String, int>.from(d['income'] ?? {'기본급':0,'장기근속수당':0,'성과급':0});
+    deduction = Map<String, int>.from(d['deduction'] ?? {'갑근세':0,'국민연금':0});
+    fixedExp = Map<String, int>.from(d['fixedExp'] ?? {'보험':0,'용돈':0});
+    variableExp = Map<String, int>.from(d['variableExp'] ?? {'식비':0,'교통비':0});
+    childExp = Map<String, int>.from(d['childExp'] ?? {'교육비':0,'주식':0});
     cardLogs = List<Map<String, dynamic>>.from(d['cardLogs'] ?? []);
     savingsHistory = List<Map<String, dynamic>>.from(storage['savingsHistory'] ?? []);
     notifyListeners();
@@ -62,44 +60,33 @@ class AccountData extends ChangeNotifier {
     _save(); notifyListeners();
   }
 
+  void addSaving(String user, int amount, DateTime date) {
+    savingsHistory.insert(0, {'date': DateFormat('yyyy-MM-dd').format(date), 'user': user, 'amount': amount});
+    _save(); notifyListeners();
+  }
+
+  void addCardLog(String desc, int amt, String brand, DateTime date, bool isClub, String note) {
+    cardLogs.add({'date': DateFormat('yyyy-MM-dd').format(date), 'desc': desc, 'amt': amt, 'card': brand, 'isClub': isClub, 'note': note});
+    _save(); notifyListeners();
+  }
+
   void _save() async {
     storage[selectedMonth] = {'income':income,'deduction':deduction,'fixedExp':fixedExp,'variableExp':variableExp,'childExp':childExp,'cardLogs':cardLogs};
     storage['savingsHistory'] = savingsHistory;
     storage['savingsGoal'] = savingsGoal;
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('ultimate_pro_v40', jsonEncode(storage));
+    prefs.setString('ultimate_master_v50', jsonEncode(storage));
   }
 
-  // 카드 통계
-  Map<String, int> get cardTotals {
-    Map<String, int> totals = {};
-    for (var log in cardLogs) {
-      String brand = log['card'];
-      totals[brand] = (totals[brand] ?? 0) + (log['amt'] as int);
-    }
-    return totals;
-  }
+  int get totalA => savingsHistory.where((h) => h['user'] == "A").fold(0, (sum, item) => sum + (item['amount'] as int));
+  int get totalB => savingsHistory.where((h) => h['user'] == "B").fold(0, (sum, item) => sum + (item['amount'] as int));
   
-  int get totalCardUsage => cardLogs.fold(0, (a, b) => a + (b['amt'] as int));
-
-  // 통계 계산 로직 (최근 12개월)
-  List<double> getRecent12MonthsData() {
-    List<double> data = [];
-    DateTime now = DateTime.now();
-    for (int i = 11; i >= 0; i--) {
-      DateTime date = DateTime(now.year, now.month - i, 1);
-      String key = DateFormat('yyyy-MM').format(date);
-      var monthData = storage[key] ?? {};
-      double sum = 0;
-      selectedStatsItems.forEach((item) {
-        sum += (monthData['income']?[item] ?? 0).toDouble();
-        sum += (monthData['fixedExp']?[item] ?? 0).toDouble();
-        sum += (monthData['variableExp']?[item] ?? 0).toDouble();
-        // 카드 데이터 합산 로직 추가 가능
-      });
-      data.add(sum);
-    }
-    return data;
+  // 에러가 났던 합계 계산을 명확하게 int로 수정
+  int getSum(String month, String cat) {
+    var d = storage[month] ?? {};
+    if (cat == 'card') return (d['cardLogs'] as List? ?? []).fold(0, (a, b) => a + (b['amt'] as int));
+    Map data = d[cat] ?? {};
+    return data.values.fold(0, (a, b) => a + (b as int));
   }
 }
 
@@ -107,7 +94,7 @@ class MyPremiumApp extends StatelessWidget {
   const MyPremiumApp({super.key});
   @override Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
-    theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.pinkAccent), // 귀여운 느낌의 핑크 인디고
+    theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo),
     home: const MainScaffold(),
   );
 }
@@ -128,124 +115,126 @@ class _MainScaffoldState extends State<MainScaffold> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     final d = context.watch<AccountData>();
-    bool hideFilter = _tab.index >= 3;
+    bool showYearFilter = _tab.index == 3;
+    bool showNothing = _tab.index == 4;
     return Scaffold(
       appBar: AppBar(
-        title: hideFilter ? Text(_tab.index == 3 ? "항목별 연간 통계" : "저축 목표 관리") 
-          : ActionChip(
-              avatar: const Icon(Icons.calendar_month, size: 16),
-              label: Text(d.selectedMonth),
-              onPressed: () async {
+        title: showYearFilter ? DropdownButton<String>(value: d.selectedYear, items: ["2025","2026"].map((y)=>DropdownMenuItem(value:y, child:Text("$y년 통계"))).toList(), onChanged:(v){if(v!=null)setState(()=>d.selectedYear=v);})
+             : showNothing ? const Text("6,400만원 저축 목표") : ActionChip(label: Text(d.selectedMonth), onPressed: () async {
                 DateTime? p = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2024), lastDate: DateTime(2030));
                 if (p != null) d.loadMonth(DateFormat('yyyy-MM').format(p));
-              },
-            ),
-        actions: [
-          if (_tab.index == 4) IconButton(icon: const Icon(Icons.settings), onPressed: () => _setGoalDlg(context, d)),
-        ],
-        bottom: TabBar(controller: _tab, isScrollable: true, tabs: const [Tab(text: "수입"), Tab(text: "지출"), Tab(text: "카드"), Tab(text: "통계"), Tab(text: "저축")]),
+             }),
+        actions: [if(_tab.index == 4) IconButton(icon: const Icon(Icons.settings), onPressed: () => _setGoalDlg(context, d))],
+        bottom: TabBar(controller: _tab, isScrollable: true, tabs: const [Tab(text:"수입"), Tab(text:"지출"), Tab(text:"카드"), Tab(text:"통계"), Tab(text:"저축")]),
       ),
       body: TabBarView(controller: _tab, children: [const TabInc(), const TabExp(), const TabCard(), const TabStatsLandscape(), const TabSaving()]),
     );
   }
 }
 
-// 1. 수입 탭 (레이아웃 개선)
+// 수입/지출 2줄 레이아웃 (가독성 100%)
+Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d) {
+  return Column(children: [
+    Container(padding: const EdgeInsets.all(6), color: c.withOpacity(0.1), width: double.infinity, child: Text(t, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 11))),
+    Expanded(child: ListView(padding: const EdgeInsets.all(8), children: data.keys.map((k) => Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.black12)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(k, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+        TextField(
+          textAlign: TextAlign.right, keyboardType: TextInputType.number,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.indigo),
+          decoration: const InputDecoration(border: InputBorder.none, isDense: true, suffixText: " 원"),
+          controller: TextEditingController(text: d.nf.format(data[k])),
+          onSubmitted: (v) => d.updateVal(cat, k, int.tryParse(v.replaceAll(',', '')) ?? 0),
+        )
+      ]),
+    )).toList()))
+  ]);
+}
+
 class TabInc extends StatelessWidget {
   const TabInc({super.key});
   @override Widget build(BuildContext context) {
     final d = context.watch<AccountData>();
+    int sInc = d.income.values.fold(0, (a, b) => a + b);
+    int sDed = d.deduction.values.fold(0, (a, b) => a + b);
     return Column(children: [
-      Expanded(child: Row(children: [
-        Expanded(child: _list("세전", d.income, 'inc', Colors.blue, d)),
-        Expanded(child: _list("공제", d.deduction, 'ded', Colors.red, d)),
-      ])),
-      _summaryBox([_row("실수령액", d.income.values.fold(0, (a,b)=>a+b) - d.deduction.values.fold(0, (a,b)=>a+b), Colors.indigo, b: true)])
+      Expanded(child: Row(children: [Expanded(child: _list("세전", d.income, 'inc', Colors.blue, d)), const VerticalDivider(width: 1), Expanded(child: _list("공제", d.deduction, 'ded', Colors.red, d))])),
+      _summaryBox([_row("세전 합계", sInc, Colors.blue), _row("공제 합계", sDed, Colors.red), const Divider(), _row("실수령액", sInc - sDed, Colors.indigo, b: true)])
     ]);
   }
 }
 
-// 2. 지출 탭
 class TabExp extends StatelessWidget {
   const TabExp({super.key});
   @override Widget build(BuildContext context) {
     final d = context.watch<AccountData>();
+    int sFix = d.fixedExp.values.fold(0, (a,b)=>a+b);
+    int sVar = d.variableExp.values.fold(0, (a,b)=>a+b);
+    int sChi = d.childExp.values.fold(0, (a,b)=>a+b);
     return Column(children: [
-      Expanded(child: Row(children: [
-        Expanded(child: _list("고정", d.fixedExp, 'fix', Colors.teal, d)),
-        Expanded(child: _list("변동", d.variableExp, 'var', Colors.orange, d)),
-        Expanded(child: _list("자녀", d.childExp, 'chi', Colors.purple, d)),
-      ])),
-      _summaryBox([_row("지출 총합", d.fixedExp.values.fold(0, (a,b)=>a+b) + d.variableExp.values.fold(0, (a,b)=>a+b) + d.childExp.values.fold(0, (a,b)=>a+b), Colors.deepOrange, b: true)])
+      Expanded(child: Row(children: [Expanded(child: _list("고정", d.fixedExp, 'fix', Colors.teal, d)), Expanded(child: _list("변동", d.variableExp, 'var', Colors.orange, d)), Expanded(child: _list("자녀", d.childExp, 'chi', Colors.purple, d))])),
+      _summaryBox([_row("고정 합계", sFix, Colors.teal), _row("변동 합계", sVar, Colors.orange), _row("자녀 합계", sChi, Colors.purple), const Divider(), _row("지출 총합", sFix+sVar+sChi, Colors.deepOrange, b: true)])
     ]);
   }
 }
 
-// 3. 카드 탭 (날짜별 음영 및 카드별 집계)
 class TabCard extends StatelessWidget {
   const TabCard({super.key});
   @override Widget build(BuildContext context) {
     final d = context.watch<AccountData>();
     String lastDate = ""; bool shade = false;
+    Map<String, int> brandTotals = {};
+    for(var log in d.cardLogs) brandTotals[log['card']] = (brandTotals[log['card']] ?? 0) + (log['amt'] as int);
+
     return Column(children: [
-      Expanded(
-        child: ListView.builder(
-          itemCount: d.cardLogs.length,
-          itemBuilder: (ctx, i) {
-            final log = d.cardLogs[i];
-            if (log['date'] != lastDate) { shade = !shade; lastDate = log['date']; }
-            return Container(
-              color: shade ? Colors.grey.withOpacity(0.05) : Colors.white,
-              child: ListTile(
-                dense: true,
-                title: Text("${log['date'].substring(5)} | ${log['desc']} (${log['card']})"),
-                trailing: Text("${d.nf.format(log['amt'])}원", style: const TextStyle(fontWeight: FontWeight.bold)),
-                onTap: () => _showNote(context, log['note']),
-              ),
-            );
-          },
-        ),
-      ),
-      _summaryBox([
-        ...d.cardTotals.entries.map((e) => _row(e.key, e.value, Colors.blueGrey)),
-        const Divider(),
-        _row("총 카드 사용액", d.totalCardUsage, Colors.indigo, b: true),
-      ])
+      Expanded(child: Scaffold(
+        floatingActionButton: FloatingActionButton.small(onPressed: () => _addCardDlg(context, d), child: const Icon(Icons.add)),
+        body: ListView.builder(itemCount: d.cardLogs.length, itemBuilder: (ctx, i) {
+          final log = d.cardLogs[i];
+          if (log['date'] != lastDate) { shade = !shade; lastDate = log['date']; }
+          return Container(color: shade ? Colors.grey.withOpacity(0.05) : Colors.white, child: ListTile(
+            dense: true, title: Text("${log['date'].substring(5)} | ${log['desc']} (${log['card']})"),
+            trailing: Text("${d.nf.format(log['amt'])}원", style: const TextStyle(fontWeight: FontWeight.bold)),
+            onTap: () => _showNote(context, log['note']),
+          ));
+        }),
+      )),
+      _summaryBox([...brandTotals.entries.map((e) => _row(e.key, e.value, Colors.blueGrey)), const Divider(), _row("총 카드 사용액", d.cardLogs.fold(0, (a,b)=>a+(b['amt'] as int)), Colors.indigo, b: true)])
     ]);
   }
 }
 
-// 4. 통계 탭 (가로형 체크박스 선택 시스템)
 class TabStatsLandscape extends StatelessWidget {
   const TabStatsLandscape({super.key});
   @override Widget build(BuildContext context) {
     final d = context.watch<AccountData>();
-    final chartData = d.getRecent12MonthsData();
-    return RotatedBox(
-      quarterTurns: 0, // 필요시 휴대폰을 돌려보세요
-      child: Column(children: [
-        SizedBox(
-          height: 60,
-          child: ListView(scrollDirection: Axis.horizontal, children: [
-            ...d.income.keys.map((k) => _filterChip(k, d)),
-            ...d.fixedExp.keys.map((k) => _filterChip(k, d)),
-          ]),
-        ),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: BarChart(BarChartData(
-              barGroups: List.generate(12, (i) => BarChartGroupData(x: i, barRods: [BarChartRodData(toY: chartData[i], color: Colors.pinkAccent, width: 15)])),
-              titlesData: FlTitlesData(bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (v, m) => Text("${v.toInt()+1}월", style: const TextStyle(fontSize: 10))))),
-            )),
-          ),
-        )
-      ]),
-    );
+    return Column(children: [
+      const Text("항목 선택 후 12개월 추이 확인", style: TextStyle(fontSize: 12, color: Colors.grey)),
+      SizedBox(height: 50, child: ListView(scrollDirection: Axis.horizontal, children: [...d.income.keys, ...d.fixedExp.keys, ...d.variableExp.keys].map((k) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: FilterChip(label: Text(k), selected: d.selectedStatsItems.contains(k), onSelected: (v){ if(v) d.selectedStatsItems.add(k); else d.selectedStatsItems.remove(k); d.notifyListeners(); }),
+      )).toList())),
+      Expanded(child: Padding(padding: const EdgeInsets.all(20), child: BarChart(BarChartData(
+        barGroups: List.generate(12, (i) {
+          String m = "${d.selectedYear}-${(i+1).toString().padLeft(2,'0')}";
+          double sum = 0;
+          var monthData = d.storage[m] ?? {};
+          d.selectedStatsItems.forEach((it) {
+            sum += (monthData['income']?[it] ?? 0).toDouble();
+            sum += (monthData['fixedExp']?[it] ?? 0).toDouble();
+            sum += (monthData['variableExp']?[it] ?? 0).toDouble();
+          });
+          return BarChartGroupData(x: i, barRods: [BarChartRodData(toY: sum, color: Colors.indigo, width: 15)]);
+        }),
+        titlesData: FlTitlesData(bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (v,m)=>Text("${v.toInt()+1}월", style:const TextStyle(fontSize:10))))),
+      ))))
+    ]);
   }
 }
 
-// 5. 저축 탭 (A/B 대칭 및 수정 기능)
 class TabSaving extends StatelessWidget {
   const TabSaving({super.key});
   @override Widget build(BuildContext context) {
@@ -253,74 +242,44 @@ class TabSaving extends StatelessWidget {
     double progA = (d.totalA / (d.savingsGoal / 2)).clamp(0.0, 1.0);
     double progB = (d.totalB / (d.savingsGoal / 2)).clamp(0.0, 1.0);
     return Column(children: [
-      Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(children: [
-          _saveBar(progA, Colors.blue, "A", true),
-          const SizedBox(width: 4),
-          _saveBar(progB, Colors.green, "B", false),
-        ]),
-      ),
-      Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-        ElevatedButton(onPressed: () => _savingDlg(context, d, "A"), child: const Text("A 입금")),
-        ElevatedButton(onPressed: () => _savingDlg(context, d, "B"), child: const Text("B 입금")),
+      Padding(padding: const EdgeInsets.all(20), child: Row(children: [
+        Expanded(child: Column(children: [const Icon(Icons.person, color: Colors.blue), LinearProgressIndicator(value: progA, minHeight: 25, color: Colors.blue, backgroundColor: Colors.blue.shade50)])),
+        const SizedBox(width: 5, child: VerticalDivider()),
+        Expanded(child: Column(children: [const Icon(Icons.person, color: Colors.green), Transform.scale(scaleX: -1, child: LinearProgressIndicator(value: progB, minHeight: 25, color: Colors.green, backgroundColor: Colors.green.shade50))])),
+      ])),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [Text("A: ${d.nf.format(d.totalA)}원"), Text("B: ${d.nf.format(d.totalB)}원")]),
+      const SizedBox(height: 10),
+      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        ElevatedButton(onPressed: () => _savingDlg(context, d, "A"), child: const Text("A 저축")),
+        const SizedBox(width: 20),
+        ElevatedButton(onPressed: () => _savingDlg(context, d, "B"), child: const Text("B 저축")),
       ]),
-      Expanded(child: ListView.builder(
-        itemCount: d.savingsHistory.length,
-        itemBuilder: (ctx, i) => ListTile(
-          leading: CircleAvatar(backgroundColor: d.savingsHistory[i]['user']=="A"?Colors.blue:Colors.green, child: Text(d.savingsHistory[i]['user'], style: const TextStyle(color: Colors.white))),
-          title: Text("${d.savingsHistory[i]['date']} | ${d.nf.format(d.savingsHistory[i]['amount'])}원"),
-          onTap: () => _editSavingDlg(context, d, i),
-        ),
-      ))
+      Expanded(child: ListView.builder(itemCount: d.savingsHistory.length, itemBuilder: (ctx, i) => ListTile(
+        leading: CircleAvatar(backgroundColor: d.savingsHistory[i]['user']=="A"?Colors.blue:Colors.green, child: Text(d.savingsHistory[i]['user'], style: const TextStyle(color: Colors.white))),
+        title: Text("${d.savingsHistory[i]['date']} | ${d.nf.format(d.savingsHistory[i]['amount'])}원"),
+        onTap: () => _editSavingDlg(context, d, i),
+      )))
     ]);
   }
 }
 
-// 위젯 및 다이얼로그 헬퍼 함수들
-Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d) {
-  return Column(children: [
-    Container(padding: const EdgeInsets.all(4), color: c.withOpacity(0.1), width: double.infinity, child: Text(t, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 11))),
-    Expanded(child: ListView(children: data.keys.map((k) => Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      child: TextField(
-        textAlign: TextAlign.right, keyboardType: TextInputType.number,
-        decoration: InputDecoration(labelText: k, labelStyle: const TextStyle(fontSize: 10), isDense: true, border: const OutlineInputBorder()),
-        controller: TextEditingController(text: d.nf.format(data[k])),
-        onSubmitted: (v) => d.updateVal(cat, k, int.tryParse(v.replaceAll(',', '')) ?? 0),
-      ),
-    )).toList()))
-  ]);
-}
+// 헬퍼 함수들 (에러 수정됨)
+Widget _summaryBox(List<Widget> ch) => Container(padding: const EdgeInsets.all(10), decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.black12))), child: Column(children: ch));
+Widget _row(String l, int v, Color c, {bool b = false}) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(l, style: TextStyle(color: c, fontSize: 11, fontWeight: b?FontWeight.bold:null)), Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b?16:14))]);
 
-Widget _saveBar(double p, Color c, String user, bool left) {
-  return Expanded(child: Column(children: [
-    Text(user, style: TextStyle(color: c, fontWeight: FontWeight.bold)),
-    ClipRRect(borderRadius: BorderRadius.circular(10), child: LinearProgressIndicator(value: p, minHeight: 20, color: c, backgroundColor: c.withOpacity(0.1))),
-  ]));
-}
-
-Widget _filterChip(String label, AccountData d) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 4),
-    child: FilterChip(
-      label: Text(label, style: const TextStyle(fontSize: 10)),
-      selected: d.selectedStatsItems.contains(label),
-      onSelected: (v) { if(v) d.selectedStatsItems.add(label); else d.selectedStatsItems.remove(label); d.notifyListeners(); },
-    ),
-  );
-}
-
-Widget _summaryBox(List<Widget> children) => Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.grey.shade300))), child: Column(children: children));
-Widget _row(String l, int v, Color c, {bool b = false}) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(l, style: TextStyle(color: c, fontSize: 11, fontWeight: b?FontWeight.bold:null)), Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold))]);
-
-void _setGoalDlg(BuildContext context, AccountData d) {
-  int goal = d.savingsGoal;
-  showDialog(context: context, builder: (ctx) => AlertDialog(
-    title: const Text("저축 목표 설정"),
-    content: TextField(keyboardType: TextInputType.number, decoration: const InputDecoration(suffixText: "원"), controller: TextEditingController(text: goal.toString()), onChanged: (v) => goal = int.tryParse(v) ?? goal),
-    actions: [TextButton(onPressed: () { d.savingsGoal = goal; d._save(); d.notifyListeners(); Navigator.pop(ctx); }, child: const Text("변경"))],
-  ));
+void _savingDlg(BuildContext context, AccountData d, String user) {
+  int amt = 0; DateTime date = DateTime.now();
+  showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
+    title: Text("$user 저축 입력"),
+    content: Column(mainAxisSize: MainAxisSize.min, children: [
+      ListTile(title: Text(DateFormat('yyyy-MM-dd').format(date)), trailing: const Icon(Icons.calendar_month), onTap: () async {
+        DateTime? p = await showDatePicker(context: context, initialDate: date, firstDate: DateTime(2024), lastDate: DateTime(2030));
+        if (p != null) setS(() => date = p);
+      }),
+      TextField(keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "금액", suffixText: "원"), onChanged: (v) => amt = int.tryParse(v) ?? 0),
+    ]),
+    actions: [TextButton(onPressed: () { d.addSaving(user, amt, date); Navigator.pop(ctx); }, child: const Text("저장"))],
+  )));
 }
 
 void _editSavingDlg(BuildContext context, AccountData d, int i) {
@@ -334,4 +293,36 @@ void _editSavingDlg(BuildContext context, AccountData d, int i) {
     ],
   ));
 }
-// (나머지 다이얼로그 함수 등은 이전의 안정된 구조를 유지합니다)
+
+void _addCardDlg(BuildContext context, AccountData d) {
+  String desc = ""; int amt = 0; String brand = "우리"; DateTime date = DateTime.now(); bool isClub = false; String note = "";
+  showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
+    title: const Text("카드 사용내역 추가"),
+    content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      ListTile(title: Text(DateFormat('yyyy-MM-dd').format(date)), trailing: const Icon(Icons.calendar_month), onTap: () async {
+        DateTime? p = await showDatePicker(context: context, initialDate: date, firstDate: DateTime(2024), lastDate: DateTime(2030));
+        if (p != null) setS(() => date = p);
+      }),
+      TextField(decoration: const InputDecoration(labelText: "사용내역"), onChanged: (v) => desc = v),
+      TextField(decoration: const InputDecoration(labelText: "금액"), keyboardType: TextInputType.number, onChanged: (v) => amt = int.tryParse(v) ?? 0),
+      DropdownButton<String>(value: brand, isExpanded: true, items: ["우리","현대","KB","삼성"].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setS(() => brand = v!)),
+      SwitchListTile(title: const Text("회비여부"), value: isClub, onChanged: (v) => setS(() => isClub = v)),
+      TextField(decoration: const InputDecoration(labelText: "비고"), onChanged: (v) => note = v),
+    ])),
+    actions: [TextButton(onPressed: () { d.addCardLog(desc, amt, brand, date, isClub, note); Navigator.pop(ctx); }, child: const Text("추가"))],
+  )));
+}
+
+void _showNote(BuildContext context, String? note) {
+  if (note == null || note.isEmpty) return;
+  showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text("비고"), content: Text(note), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("확인"))]));
+}
+
+void _setGoalDlg(BuildContext context, AccountData d) {
+  int goal = d.savingsGoal;
+  showDialog(context: context, builder: (ctx) => AlertDialog(
+    title: const Text("저축 목표 설정"),
+    content: TextField(keyboardType: TextInputType.number, decoration: const InputDecoration(suffixText: "원"), controller: TextEditingController(text: goal.toString()), onChanged: (v) => goal = int.tryParse(v) ?? goal),
+    actions: [TextButton(onPressed: () { d.savingsGoal = goal; d._save(); d.notifyListeners(); Navigator.pop(ctx); }, child: const Text("변경"))],
+  ));
+}
