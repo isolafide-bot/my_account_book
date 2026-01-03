@@ -37,7 +37,7 @@ class AccountData extends ChangeNotifier {
 
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
-    String? raw = prefs.getString('ultimate_final_perfect_master_v3');
+    String? raw = prefs.getString('ultimate_final_master_v130_stable');
     if (raw != null) storage = jsonDecode(raw);
     loadMonth(selectedMonth);
   }
@@ -78,7 +78,7 @@ class AccountData extends ChangeNotifier {
     storage[selectedMonth] = {'income':income,'deduction':deduction,'fixedExp':fixedExp,'variableExp':variableExp,'childExp':childExp,'cardLogs':cardLogs};
     storage['savingsHistory'] = savingsHistory;
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('ultimate_final_perfect_master_v3', jsonEncode(storage));
+    prefs.setString('ultimate_final_master_v130_stable', jsonEncode(storage));
   }
 
   int get totalA => savingsHistory.where((h) => h['user'] == "A").fold(0, (sum, item) => sum + (item['amount'] as int));
@@ -114,7 +114,7 @@ class _MainScaffoldState extends State<MainScaffold> with SingleTickerProviderSt
       appBar: AppBar(
         centerTitle: true,
         title: _tab.index >= 3 ? Text(_tab.index == 3 ? "통계 분석" : "저축 리포트") : ActionChip(
-          label: Text(d.selectedMonth),
+          label: Text(d.selectedMonth, style: const TextStyle(fontWeight: FontWeight.bold)),
           onPressed: () async {
             DateTime? p = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2024), lastDate: DateTime(2030));
             if (p != null) d.loadMonth(DateFormat('yyyy-MM').format(p));
@@ -132,7 +132,7 @@ class _MainScaffoldState extends State<MainScaffold> with SingleTickerProviderSt
   }
 }
 
-// 항목 간 여백 및 글자 잘림 완전 수정 버전
+// 1 & 2. 수입/지출: 첫 항목 잘림 방지(Top Padding 15px) 및 항목 간 여백 확대(6px)
 Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d) {
   return Column(children: [
     Container(
@@ -141,23 +141,25 @@ Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d
       width: double.infinity, 
       child: Text(t, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 11))
     ),
-    const SizedBox(height: 10), // 대분류와 세부항목 사이 시원한 여백
-    Expanded(child: ListView(padding: const EdgeInsets.symmetric(horizontal: 4), children: data.keys.map((k) {
+    const SizedBox(height: 5), 
+    Expanded(child: ListView(
+      padding: const EdgeInsets.fromLTRB(4, 15, 4, 10), // 상단 여백 15px로 잘림 완벽 해결
+      children: data.keys.map((k) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 3), // 항목 간 여백 미세 확대 (1px -> 3px)
+        padding: const EdgeInsets.only(bottom: 6), // 항목 간 여백 6px로 확대
         child: SizedBox(
-          height: 48, // 높이 고정
+          height: 52, // 높이 안정화
           child: TextField(
             textAlign: TextAlign.right, keyboardType: TextInputType.number,
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
             decoration: InputDecoration(
               labelText: k, 
-              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
-              floatingLabelBehavior: FloatingLabelBehavior.always, // 라벨 위치 고정하여 잘림 방지
+              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.black87),
+              floatingLabelBehavior: FloatingLabelBehavior.always, 
               isDense: true, 
               border: const OutlineInputBorder(), 
               suffixText: '원',
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12) // 상하 여백으로 잘림 방지
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14) // 내부 여백 최적화
             ),
             controller: TextEditingController(text: d.nf.format(data[k])),
             onSubmitted: (v) => d.updateVal(cat, k, int.tryParse(v.replaceAll(',', '')) ?? 0),
@@ -277,11 +279,11 @@ class _TabStatsSmartState extends State<TabStatsSmart> {
         Padding(padding: const EdgeInsets.all(16.0), child: ElevatedButton(
           style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
           onPressed: () => setState(() { d.isStatsViewMode = true; confirmedStatsItems = Set.from(d.tempCheckedItems); }),
-          child: const Text("항목 분석하기", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          child: const Text("데이터 분석 시작", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         )),
       ] else ...[
         Padding(padding: const EdgeInsets.all(16.0), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          const Text("📊 12개월 재정 데이터", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const Text("📊 12개월 추이 리포트", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           IconButton(icon: const Icon(Icons.refresh), onPressed: () => setState(() => d.isStatsViewMode = false)),
         ])),
         Expanded(child: Padding(padding: const EdgeInsets.fromLTRB(5, 40, 20, 20), child: BarChart(BarChartData(
@@ -310,7 +312,7 @@ class _TabStatsSmartState extends State<TabStatsSmart> {
             }
             return BarChartGroupData(x: i, barRods: [BarChartRodData(
               toY: sum, gradient: const LinearGradient(colors: [Colors.orangeAccent, Colors.pinkAccent], begin: Alignment.bottomCenter, end: Alignment.topCenter), 
-              width: 20, borderRadius: const BorderRadius.only(topLeft: Radius.circular(6), topRight: Radius.circular(6))
+              width: 22, borderRadius: const BorderRadius.only(topLeft: Radius.circular(6), topRight: Radius.circular(6))
             )], showingTooltipIndicators: [0]);
           }),
           barTouchData: BarTouchData(touchTooltipData: BarTouchTooltipData(
@@ -337,13 +339,13 @@ class TabSaving extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white, 
           borderRadius: BorderRadius.circular(25),
-          border: Border.all(color: Colors.orangeAccent.withOpacity(0.5), width: 2),
-          boxShadow: [BoxShadow(color: Colors.orangeAccent.withOpacity(0.15), blurRadius: 15, spreadRadius: 2)]
+          border: Border.all(color: Colors.orangeAccent.withOpacity(0.5), width: 2.5),
+          boxShadow: [BoxShadow(color: Colors.orangeAccent.withOpacity(0.15), blurRadius: 20, spreadRadius: 3)]
         ),
         child: Column(children: [
-          const Text("✨ 전체 통합 누적 금액 ✨", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orange)),
-          const SizedBox(height: 10),
-          Text("${d.nf.format(d.totalA + d.totalB)}원", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.indigo, letterSpacing: 1.5)),
+          const Text("✨ 전체 통합 누적 금액 ✨", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.orange)),
+          const SizedBox(height: 12),
+          Text("${d.nf.format(d.totalA + d.totalB)}원", style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: Colors.indigo, letterSpacing: 1.5)),
         ]),
       ),
       Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Row(children: [
@@ -371,14 +373,14 @@ class TabSaving extends StatelessWidget {
 }
 
 Widget _summaryBox(List<Widget> c) => Container(
-  padding: const EdgeInsets.fromLTRB(15, 12, 15, 20), 
+  padding: const EdgeInsets.fromLTRB(15, 12, 15, 25), 
   decoration: BoxDecoration(color: Colors.white, border: const Border(top: BorderSide(color: Colors.black12)), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]), 
   child: Column(children: c)
 );
 
 Widget _row(String l, int v, Color c, {bool b = false}) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-  Text(l, style: TextStyle(color: c, fontSize: 11, fontWeight: b ? FontWeight.bold : null)), 
-  Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b ? 20 : 15))
+  Text(l, style: TextStyle(color: c, fontSize: 12, fontWeight: b ? FontWeight.bold : null)), 
+  Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b ? 22 : 16))
 ]);
 
 void _savingDlg(BuildContext context, AccountData d, String user) {
