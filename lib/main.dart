@@ -34,7 +34,7 @@ class AccountData extends ChangeNotifier {
 
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
-    String? raw = prefs.getString('ultimate_master_v100_final');
+    String? raw = prefs.getString('ultimate_master_v100_stable');
     if (raw != null) storage = jsonDecode(raw);
     savingsGoal = storage['savingsGoal'] ?? 64000000;
     loadMonth(selectedMonth);
@@ -43,11 +43,11 @@ class AccountData extends ChangeNotifier {
   void loadMonth(String month) {
     selectedMonth = month;
     var d = storage[month] ?? {};
-    income = Map<String, int>.from(d['income'] ?? {'기본급':0,'장기근속수당':0,'시간외근무수당':0,'가족수당':0,'식대보조비':0,'대우수당':0,'직무수행급':0,'성과급':0,'임금인상분':0,'기타1':0,'기타2':0,'기타3':0});
-    deduction = Map<String, int>.from(d['deduction'] ?? {'갑근세':0,'주민세':0,'건강보험료':0,'고용보험료':0,'국민연금':0,'요양보험':0,'식권구입비':0,'노동조합비':0,'환상성금':0,'아동발달지원계좌':0,'교양활동반회비':0,'기타1':0,'기타2':0,'기타3':0});
-    fixedExp = Map<String, int>.from(d['fixedExp'] ?? {'KB보험':133221,'삼성생명':167226,'주택화재보험':24900,'한화보험':28650,'변액연금':200000,'일산':300000,'암사동':300000,'주택청약':100000,'사촌모임회비':30000,'용돈':500000});
-    variableExp = Map<String, int>.from(d['variableExp'] ?? {'십일조':0,'대출원리금':0,'연금저축':0,'IRP':0,'식비':0,'교통비':0,'관리비':0,'도시가스':0,'하이패스':0,'통신비':0});
-    childExp = Map<String, int>.from(d['childExp'] ?? {'교육비(똘1)':0,'교육비(똘2)':0,'주식(똘1)':0,'주식(똘2)':0,'청약(똘1)':0,'청약(똘2)':0,'교통비(똘1)':0,'교통비(똘2)':0});
+    income = Map<String, int>.from(d['income'] ?? {'기본급':0,'장기근속수당':0,'성과급':0,'임금인상분':0,'기타1':0,'기타2':0,'기타3':0});
+    deduction = Map<String, int>.from(d['deduction'] ?? {'갑근세':0,'주민세':0,'건강보험료':0,'국민연금':0,'요양보험':0,'기기타1':0,'기타2':0});
+    fixedExp = Map<String, int>.from(d['fixedExp'] ?? {'KB보험':133221,'삼성생명':167226,'변액연금':200000,'일산':300000,'암사동':300000,'주택청약':100000,'용돈':500000});
+    variableExp = Map<String, int>.from(d['variableExp'] ?? {'십일조':0,'대출원리금':0,'식비':0,'교통비':0,'통신비':0});
+    childExp = Map<String, int>.from(d['childExp'] ?? {'교육비(똘1)':0,'교육비(똘2)':0,'주식(똘1)':0,'주식(똘2)':0});
     cardLogs = List<Map<String, dynamic>>.from(d['cardLogs'] ?? []);
     savingsHistory = List<Map<String, dynamic>>.from(storage['savingsHistory'] ?? []);
     notifyListeners();
@@ -77,7 +77,7 @@ class AccountData extends ChangeNotifier {
     storage['savingsHistory'] = savingsHistory;
     storage['savingsGoal'] = savingsGoal;
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('ultimate_master_v100_final', jsonEncode(storage));
+    prefs.setString('ultimate_master_v100_stable', jsonEncode(storage));
   }
 
   int get totalA => savingsHistory.where((h) => h['user'] == "A").fold(0, (sum, item) => sum + (item['amount'] as int));
@@ -112,7 +112,7 @@ class _MainScaffoldState extends State<MainScaffold> with SingleTickerProviderSt
     final d = context.watch<AccountData>();
     return Scaffold(
       appBar: AppBar(
-        title: _tab.index == 3 ? const Text("통계 리포트") : _tab.index == 4 ? const Text("저축 목표") : ActionChip(
+        title: _tab.index == 3 ? const Text("통계 리포트") : _tab.index == 4 ? const Text("저축 현황") : ActionChip(
           avatar: const Icon(Icons.calendar_month, size: 16),
           label: Text(d.selectedMonth),
           onPressed: () async {
@@ -120,7 +120,6 @@ class _MainScaffoldState extends State<MainScaffold> with SingleTickerProviderSt
             if (p != null) d.loadMonth(DateFormat('yyyy-MM').format(p));
           },
         ),
-        actions: [if(_tab.index == 4) IconButton(icon: const Icon(Icons.settings), onPressed: () => _setGoalDlg(context, d))],
         bottom: TabBar(controller: _tab, isScrollable: true, tabs: const [Tab(text: "수입"), Tab(text: "지출"), Tab(text: "카드"), Tab(text: "통계"), Tab(text: "저축")]),
       ),
       body: TabBarView(controller: _tab, children: [const TabInc(), const TabExp(), const TabCard(), const TabStatsBase(), const TabSaving()]),
@@ -128,15 +127,15 @@ class _MainScaffoldState extends State<MainScaffold> with SingleTickerProviderSt
   }
 }
 
-// 1 & 2. 수입/지출: 높이 30% 증가, 여백 50% 감소 적용
+// 1. 수입/지출: 높이 30% 증가(48px), 여백 50% 감소(4px) 적용
 Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d) {
   return Column(children: [
     Container(padding: const EdgeInsets.all(4), color: c.withOpacity(0.1), width: double.infinity, child: Text(t, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 11))),
     Expanded(child: ListView(padding: const EdgeInsets.all(2), children: data.keys.map((k) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 4), // 여백 반으로 감소
+        padding: const EdgeInsets.only(bottom: 4), // 여백 감소
         child: SizedBox(
-          height: 48, // 높이 약 30% 증가
+          height: 48, // 높이 증가
           child: TextField(
             textAlign: TextAlign.right, keyboardType: TextInputType.number,
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
@@ -193,9 +192,6 @@ class TabCard extends StatelessWidget {
   @override Widget build(BuildContext context) {
     final d = context.watch<AccountData>();
     String lastDate = ""; bool shade = false;
-    Map<String, int> brandTotals = {};
-    for (var log in d.cardLogs) brandTotals[log['card']] = (brandTotals[log['card']] ?? 0) + (log['amt'] as int);
-
     return Column(children: [
       Expanded(child: Scaffold(
         floatingActionButton: FloatingActionButton.small(onPressed: () => _addCardDlg(context, d), child: const Icon(Icons.add)),
@@ -212,15 +208,12 @@ class TabCard extends StatelessWidget {
           },
         ),
       )),
-      _summaryBox([
-        ...brandTotals.entries.map((e) => _row(e.key, e.value, Colors.blueGrey)),
-        const Divider(height: 8), _row("총 카드 합계", d.cardLogs.fold(0, (a, b) => a + (b['amt'] as int)), Colors.indigo, b: true)
-      ])
+      _summaryBox([_row("총 카드 합계", d.cardLogs.fold(0, (a, b) => a + (b['amt'] as int)), Colors.indigo, b: true)])
     ]);
   }
 }
 
-// 3. 통계: 세로 단위 제거, 기준월 선택, 계층형 필터
+// 3. 통계: 세로 단위 제거, 기준월 기반 12개월 조회, 계층형 필터
 class TabStatsBase extends StatelessWidget {
   const TabStatsBase({super.key});
   @override Widget build(BuildContext context) {
@@ -242,7 +235,7 @@ class TabStatsBase extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: ChoiceChip(label: Text(c), selected: d.statsCategory == c, onSelected: (v) { d.statsCategory = c; d.checkedItems.clear(); d.notifyListeners(); }),
       )).toList()),
-      if (items.isNotEmpty) Container(
+      if (items.isNotEmpty) SizedBox(
         height: 50, child: ListView(scrollDirection: Axis.horizontal, children: items.map((it) => Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: FilterChip(label: Text(it, style: const TextStyle(fontSize: 10)), selected: d.checkedItems.contains(it), onSelected: (v) { if(v) d.checkedItems.add(it); else d.checkedItems.remove(it); d.notifyListeners(); }),
@@ -280,7 +273,7 @@ class TabStatsBase extends StatelessWidget {
   }
 }
 
-// 4. 저축: 전체 누적 금액 및 반짝반짝 효과
+// 4. 저축: 합산 누적 금액 ✨ 효과 반영
 class TabSaving extends StatelessWidget {
   const TabSaving({super.key});
   @override Widget build(BuildContext context) {
@@ -289,23 +282,23 @@ class TabSaving extends StatelessWidget {
     double pB = (d.totalB / (d.savingsGoal / 2)).clamp(0.0, 1.0);
     return Column(children: [
       Container(
-        margin: const EdgeInsets.all(16), padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.orangeAccent.withOpacity(0.2), blurRadius: 10)]),
+        margin: const EdgeInsets.all(16), padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.orangeAccent.withOpacity(0.5)), boxShadow: [BoxShadow(color: Colors.orangeAccent.withOpacity(0.1), blurRadius: 10)]),
         child: Column(children: [
           const Text("✨ 전체 통합 누적 금액 ✨", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange)),
-          Text("${d.nf.format(d.totalSavingCombined)}원", style: const TextStyle(fontSize: 26, fontWeight: FontWeight.black, color: Colors.indigo, letterSpacing: 1.2)),
+          Text("${d.nf.format(d.totalSavingCombined)}원", style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.indigo, letterSpacing: 1.0)),
         ]),
       ),
       Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Row(children: [
         Expanded(child: Column(children: [
           const CircleAvatar(radius: 24, backgroundColor: Colors.blue, child: Text("A", style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold))),
-          Text(d.nf.format(d.totalA), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          Text(d.nf.format(d.totalA), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue)),
           LinearProgressIndicator(value: pA, minHeight: 25, color: Colors.blue, backgroundColor: Colors.blue.shade50, borderRadius: BorderRadius.circular(10))
         ])),
         const SizedBox(width: 8),
         Expanded(child: Column(children: [
           const CircleAvatar(radius: 24, backgroundColor: Colors.green, child: Text("B", style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold))),
-          Text(d.nf.format(d.totalB), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          Text(d.nf.format(d.totalB), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
           Transform.scale(scaleX: -1, child: LinearProgressIndicator(value: pB, minHeight: 25, color: Colors.green, backgroundColor: Colors.green.shade50, borderRadius: BorderRadius.circular(10)))
         ])),
       ])),
@@ -320,7 +313,7 @@ class TabSaving extends StatelessWidget {
   }
 }
 
-// 보조 위젯 및 함수들
+// 보조 함수들
 Widget _summaryBox(List<Widget> c) => Container(padding: const EdgeInsets.all(10), decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.black12))), child: Column(children: c));
 Widget _row(String l, int v, Color c, {bool b = false}) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(l, style: TextStyle(color: c, fontSize: 11, fontWeight: b ? FontWeight.bold : null)), Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b ? 16 : 14))]);
 
