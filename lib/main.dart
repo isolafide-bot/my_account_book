@@ -26,19 +26,18 @@ class AccountData extends ChangeNotifier {
   List<Map<String, dynamic>> cardLogs = [];
   List<Map<String, dynamic>> savingsHistory = [];
   
-  // 저축 목표 비대칭 설정
   int goalA = 44000000;
   int goalB = 20000000;
 
   String statsCategory = "수입"; 
-  Set<String> tempCheckedItems = {}; // 조회 버튼 누르기 전 임시 저장
-  Set<String> confirmedStatsItems = {}; // 실제 그래프용
+  Set<String> tempCheckedItems = {}; 
+  bool isStatsViewMode = false; // 조회 후 그래프만 보여주는 모드
 
   AccountData() { _init(); }
 
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
-    String? raw = prefs.getString('ultimate_master_v110');
+    String? raw = prefs.getString('ultimate_final_v120');
     if (raw != null) storage = jsonDecode(raw);
     loadMonth(selectedMonth);
   }
@@ -46,11 +45,8 @@ class AccountData extends ChangeNotifier {
   void loadMonth(String month) {
     selectedMonth = month;
     var d = storage[month] ?? {};
-    // 수입 12개 항목 강제 복구
     income = Map<String, int>.from(d['income'] ?? {'기본급':0,'장기근속수당':0,'시간외근무수당':0,'가족수당':0,'식대보조비':0,'대우수당':0,'직무수행급':0,'성과급':0,'임금인상분':0,'기타1':0,'기타2':0,'기타3':0});
-    // 공제 14개 항목 강제 복구
-    deduction = Map<String, int>.from(d['deduction'] ?? {'갑근세':0,'주민세':0,'건강보험료':0,'고용보험료':0,'국민연금':0,'요양보험':0,'식권구입비':0,'노동조합비':0,'환상성금':0,'아동발달지원계좌':0,'교양활동반회비':0,'기기타1':0,'기타2':0,'기타3':0});
-    // 지출 항목 복구
+    deduction = Map<String, int>.from(d['deduction'] ?? {'갑근세':0,'주민세':0,'건강보험료':0,'고용보험료':0,'국민연금':0,'요양보험':0,'식권구입비':0,'노동조합비':0,'환상성금':0,'아동발달지원계좌':0,'교양활동반회비':0,'기타1':0,'기타2':0,'기타3':0});
     fixedExp = Map<String, int>.from(d['fixedExp'] ?? {'KB보험':133221,'삼성생명':167226,'주택화재보험':24900,'한화보험':28650,'변액연금':200000,'일산':300000,'암사동':300000,'주택청약':100000,'사촌모임회비':30000,'용돈':500000});
     variableExp = Map<String, int>.from(d['variableExp'] ?? {'십일조':0,'대출원리금':0,'연금저축':0,'IRP':0,'식비':0,'교통비':0,'관리비':0,'도시가스':0,'하이패스':0,'통신비':0});
     childExp = Map<String, int>.from(d['childExp'] ?? {'교육비(똘1)':0,'교육비(똘2)':0,'주식(똘1)':0,'주식(똘2)':0,'청약(똘1)':0,'청약(똘2)':0,'교통비(똘1)':0,'교통비(똘2)':0});
@@ -82,7 +78,7 @@ class AccountData extends ChangeNotifier {
     storage[selectedMonth] = {'income':income,'deduction':deduction,'fixedExp':fixedExp,'variableExp':variableExp,'childExp':childExp,'cardLogs':cardLogs};
     storage['savingsHistory'] = savingsHistory;
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('ultimate_master_v110', jsonEncode(storage));
+    prefs.setString('ultimate_final_v120', jsonEncode(storage));
   }
 
   int get totalA => savingsHistory.where((h) => h['user'] == "A").fold(0, (sum, item) => sum + (item['amount'] as int));
@@ -116,7 +112,7 @@ class _MainScaffoldState extends State<MainScaffold> with SingleTickerProviderSt
     final d = context.watch<AccountData>();
     return Scaffold(
       appBar: AppBar(
-        title: _tab.index >= 3 ? Text(_tab.index == 3 ? "통계 리포트" : "저축 목표") : ActionChip(
+        title: _tab.index >= 3 ? Text(_tab.index == 3 ? "통계 분석" : "저축 목표") : ActionChip(
           label: Text(d.selectedMonth),
           onPressed: () async {
             DateTime? p = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2024), lastDate: DateTime(2030));
@@ -125,25 +121,25 @@ class _MainScaffoldState extends State<MainScaffold> with SingleTickerProviderSt
         ),
         bottom: TabBar(controller: _tab, isScrollable: true, tabs: const [Tab(text: "수입"), Tab(text: "지출"), Tab(text: "카드"), Tab(text: "통계"), Tab(text: "저축")]),
       ),
-      body: TabBarView(controller: _tab, children: [const TabInc(), const TabExp(), const TabCard(), const TabStatsPro(), const TabSaving()]),
+      body: TabBarView(controller: _tab, children: [const TabInc(), const TabExp(), const TabCard(), const TabStatsSmart(), const TabSaving()]),
     );
   }
 }
 
-// 수입/지출 리스트: 높이 및 여백 사용자 최적화
+// 1 & 2. 수입/지출: 여백 반으로 감소(2px), 글자 크기 확대(15pt)
 Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d) {
   return Column(children: [
     Container(padding: const EdgeInsets.all(4), color: c.withOpacity(0.1), width: double.infinity, child: Text(t, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 11))),
     Expanded(child: ListView(padding: const EdgeInsets.all(2), children: data.keys.map((k) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.only(bottom: 2), // 여백 반으로 감소
         child: SizedBox(
           height: 48,
           child: TextField(
             textAlign: TextAlign.right, keyboardType: TextInputType.number,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold), // 글자 크기 확대
             decoration: InputDecoration(
-              labelText: k, labelStyle: const TextStyle(fontSize: 10),
+              labelText: k, labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
               isDense: true, border: const OutlineInputBorder(), suffixText: '원',
               contentPadding: const EdgeInsets.symmetric(horizontal: 8)
             ),
@@ -164,7 +160,7 @@ class TabInc extends StatelessWidget {
     int sd = d.deduction.values.fold(0, (a, b) => a + b);
     return Column(children: [
       Expanded(child: Row(children: [Expanded(child: _list("세전 수입", d.income, 'inc', Colors.blue, d)), const VerticalDivider(width: 1), Expanded(child: _list("공제 내역", d.deduction, 'ded', Colors.red, d))])),
-      _summaryBox([_row("세전 합계", si, Colors.blue), _row("공제 합계", sd, Colors.red), const Divider(height: 8), _row("실수령액", si - sd, Colors.indigo, b: true)])
+      _summaryBox([_row("실수령액", si - sd, Colors.indigo, b: true)])
     ]);
   }
 }
@@ -182,10 +178,7 @@ class TabExp extends StatelessWidget {
         Expanded(child: _list("변동지출", d.variableExp, 'var', Colors.orange, d)),
         Expanded(child: _list("자녀지출", d.childExp, 'chi', Colors.purple, d)),
       ])),
-      _summaryBox([
-        _row("고정 합계", sf, Colors.teal), _row("변동 합계", sv, Colors.orange), _row("자녀 합계", sc, Colors.purple),
-        const Divider(height: 8), _row("지출 총 합계", sf + sv + sc, Colors.deepOrange, b: true)
-      ])
+      _summaryBox([_row("지출 총 합계", sf + sv + sc, Colors.deepOrange, b: true)])
     ]);
   }
 }
@@ -216,77 +209,80 @@ class TabCard extends StatelessWidget {
   }
 }
 
-// 통계 리포트: 버튼형 조회 시스템
-class TabStatsPro extends StatefulWidget {
-  const TabStatsPro({super.key});
-  @override State<TabStatsPro> createState() => _TabStatsProState();
+// 3. 통계: 버튼 필터링 → 체크박스 선택 → 조회 시 그래프만 노출
+class TabStatsSmart extends StatefulWidget {
+  const TabStatsSmart({super.key});
+  @override State<TabStatsSmart> createState() => _TabStatsSmartState();
 }
 
-class _TabStatsProState extends State<TabStatsPro> {
+class _TabStatsSmartState extends State<TabStatsSmart> {
+  Set<String> confirmedStatsItems = {};
+
   @override Widget build(BuildContext context) {
     final d = context.watch<AccountData>();
-    List<String> items = d.statsCategory == "수입" ? [...d.income.keys, ...d.deduction.keys] : (d.statsCategory == "지출" ? [...d.fixedExp.keys, ...d.variableExp.keys, ...d.childExp.keys] : ["우리", "현대", "KB", "삼성"]);
+    List<String> items = d.statsCategory == "수입" ? [...d.income.keys, ...d.deduction.keys] : (d.statsCategory == "지출" ? [...d.fixedExp.keys, ...d.variableExp.keys, ...d.childExp.keys] : ["우리", "현대", "KB", "삼성", "LG"]);
 
     return Column(children: [
-      Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Text("기준월: ", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-          ActionChip(label: Text(d.statsBaseMonth), onPressed: () async {
-            DateTime? p = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2024), lastDate: DateTime(2030));
-            if (p != null) setState(() => d.statsBaseMonth = DateFormat('yyyy-MM').format(p));
-          }),
-        ]),
-      ),
-      Row(mainAxisAlignment: MainAxisAlignment.center, children: ["수입", "지출", "카드"].map((c) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: ChoiceChip(label: Text(c), selected: d.statsCategory == c, onSelected: (v) { setState(() { d.statsCategory = c; d.tempCheckedItems.clear(); }); }),
-      )).toList()),
-      // 세부항목 체크박스 영역
-      Expanded(child: Container(
-        margin: const EdgeInsets.all(8),
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.black12)),
-        child: GridView.count(crossAxisCount: 3, childAspectRatio: 2.5, children: items.map((it) => CheckboxListTile(
-          title: Text(it, style: const TextStyle(fontSize: 9)), dense: true, contentPadding: EdgeInsets.zero,
-          value: d.tempCheckedItems.contains(it), onChanged: (v) => setState(() { if(v!) d.tempCheckedItems.add(it); else d.tempCheckedItems.remove(it); }),
+      if (!d.isStatsViewMode) ...[
+        Padding(padding: const EdgeInsets.all(8.0), child: ActionChip(label: Text("기준월: ${d.statsBaseMonth}"), onPressed: () async {
+          DateTime? p = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2024), lastDate: DateTime(2030));
+          if (p != null) setState(() => d.statsBaseMonth = DateFormat('yyyy-MM').format(p));
+        })),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: ["수입", "지출", "카드"].map((c) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: d.statsCategory == c ? Colors.orangeAccent : Colors.grey.shade200),
+            onPressed: () => setState(() { d.statsCategory = c; d.tempCheckedItems.clear(); }),
+            child: Text(c, style: TextStyle(color: d.statsCategory == c ? Colors.white : Colors.black87)),
+          ),
         )).toList()),
-      )),
-      ElevatedButton.icon(icon: const Icon(Icons.search), label: const Text("조회하기"), onPressed: () => setState(() { d.confirmedStatsItems = Set.from(d.tempCheckedItems); })),
-      // 막대 그래프 영역
-      SizedBox(height: 200, child: Padding(padding: const EdgeInsets.all(16), child: BarChart(BarChartData(
-        gridData: const FlGridData(show: false), borderData: FlBorderData(show: false),
-        titlesData: FlTitlesData(
-          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (v, m) {
+        Expanded(child: ListView(children: items.map((it) => CheckboxListTile(
+          title: Text(it), value: d.tempCheckedItems.contains(it),
+          onChanged: (v) => setState(() { if(v!) d.tempCheckedItems.add(it); else d.tempCheckedItems.remove(it); }),
+        )).toList())),
+        Padding(padding: const EdgeInsets.all(16.0), child: ElevatedButton(
+          onPressed: () => setState(() { d.isStatsViewMode = true; confirmedStatsItems = Set.from(d.tempCheckedItems); }),
+          child: const Text("항목 조회하기"),
+        )),
+      ] else ...[
+        Padding(padding: const EdgeInsets.all(16.0), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          const Text("📊 최근 12개월 추이", style: TextStyle(fontWeight: FontWeight.bold)),
+          TextButton.icon(icon: const Icon(Icons.refresh), label: const Text("필터 재설정"), onPressed: () => setState(() => d.isStatsViewMode = false)),
+        ])),
+        Expanded(child: Padding(padding: const EdgeInsets.all(20), child: BarChart(BarChartData(
+          gridData: const FlGridData(show: false), borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
+            leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (v, m) {
+              DateTime base = DateFormat('yyyy-MM').parse(d.statsBaseMonth);
+              DateTime target = DateTime(base.year, base.month - (11 - v.toInt()), 1);
+              return Text("${target.month}월", style: const TextStyle(fontSize: 10));
+            })),
+          ),
+          barGroups: List.generate(12, (i) {
             DateTime base = DateFormat('yyyy-MM').parse(d.statsBaseMonth);
-            DateTime target = DateTime(base.year, base.month - (11 - v.toInt()), 1);
-            return Text("${target.month}월", style: const TextStyle(fontSize: 9));
-          })),
-        ),
-        barGroups: List.generate(12, (i) {
-          DateTime base = DateFormat('yyyy-MM').parse(d.statsBaseMonth);
-          String m = DateFormat('yyyy-MM').format(DateTime(base.year, base.month - (11 - i), 1));
-          double sum = 0; var monthData = d.storage[m] ?? {};
-          for (var it in d.confirmedStatsItems) {
-            sum += (monthData['income']?[it] ?? 0).toDouble();
-            sum += (monthData['deduction']?[it] ?? 0).toDouble();
-            sum += (monthData['fixedExp']?[it] ?? 0).toDouble();
-            sum += (monthData['variableExp']?[it] ?? 0).toDouble();
-            sum += (monthData['childExp']?[it] ?? 0).toDouble();
-            List logs = monthData['cardLogs'] ?? [];
-            sum += logs.where((l) => l['card'] == it).fold(0.0, (s, l) => s + (l['amt'] as int));
-          }
-          return BarChartGroupData(x: i, barRods: [BarChartRodData(toY: sum, gradient: const LinearGradient(colors: [Colors.orange, Colors.redAccent]), width: 14, borderRadius: BorderRadius.circular(4))], showingTooltipIndicators: [0]);
-        }),
-        barTouchData: BarTouchData(touchTooltipData: BarTouchTooltipData(tooltipBgColor: Colors.transparent, getTooltipItem: (g, gi, r, ri) => BarTooltipItem((r.toY / 100000).toStringAsFixed(1), const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)))),
-      )))),
+            String m = DateFormat('yyyy-MM').format(DateTime(base.year, base.month - (11 - i), 1));
+            double sum = 0; var monthData = d.storage[m] ?? {};
+            for (var it in confirmedStatsItems) {
+              sum += (monthData['income']?[it] ?? 0).toDouble();
+              sum += (monthData['deduction']?[it] ?? 0).toDouble();
+              sum += (monthData['fixedExp']?[it] ?? 0).toDouble();
+              sum += (monthData['variableExp']?[it] ?? 0).toDouble();
+              sum += (monthData['childExp']?[it] ?? 0).toDouble();
+              List logs = monthData['cardLogs'] ?? [];
+              sum += logs.where((l) => l['card'] == it).fold(0.0, (s, l) => s + (l['amt'] as int));
+            }
+            return BarChartGroupData(x: i, barRods: [BarChartRodData(toY: sum, gradient: const LinearGradient(colors: [Colors.orangeAccent, Colors.redAccent]), width: 18, borderRadius: BorderRadius.circular(4))], showingTooltipIndicators: [0]);
+          }),
+          barTouchData: BarTouchData(touchTooltipData: BarTouchTooltipData(tooltipBgColor: Colors.transparent, getTooltipItem: (g, gi, r, ri) => BarTooltipItem((r.toY / 100000).toStringAsFixed(1), const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)))),
+        )))),
+      ]
     ]);
   }
 }
 
-// 저축 탭: 비대칭 목표 적용 및 이모티콘 확대
+// 4. 저축: 비대칭 목표 및 이모티콘 확대
 class TabSaving extends StatelessWidget {
   const TabSaving({super.key});
   @override Widget build(BuildContext context) {
@@ -303,32 +299,30 @@ class TabSaving extends StatelessWidget {
         ]),
       ),
       Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Row(children: [
-        Expanded(child: _savingCard("A", d.totalA, d.goalA, pA, Colors.blue)),
+        Expanded(child: Column(children: [
+          const CircleAvatar(radius: 28, backgroundColor: Colors.blue, child: Text("A", style: TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.bold))),
+          Text(d.nf.format(d.totalA), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue)),
+          LinearProgressIndicator(value: pA, minHeight: 25, color: Colors.blue, backgroundColor: Colors.blue.shade50, borderRadius: BorderRadius.circular(10))
+        ])),
         const SizedBox(width: 8),
-        Expanded(child: _savingCard("B", d.totalB, d.goalB, pB, Colors.green)),
+        Expanded(child: Column(children: [
+          const CircleAvatar(radius: 28, backgroundColor: Colors.green, child: Text("B", style: TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.bold))),
+          Text(d.nf.format(d.totalB), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
+          Transform.scale(scaleX: -1, child: LinearProgressIndicator(value: pB, minHeight: 25, color: Colors.green, backgroundColor: Colors.green.shade50, borderRadius: BorderRadius.circular(10)))
+        ])),
       ])),
       const SizedBox(height: 12),
       Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [ElevatedButton(onPressed: () => _savingDlg(context, d, "A"), child: const Text("A 입금")), ElevatedButton(onPressed: () => _savingDlg(context, d, "B"), child: const Text("B 입금"))]),
       Expanded(child: ListView.builder(itemCount: d.savingsHistory.length, itemBuilder: (ctx, i) => ListTile(
-        leading: CircleAvatar(radius: 16, backgroundColor: d.savingsHistory[i]['user'] == "A" ? Colors.blue : Colors.green, child: Text(d.savingsHistory[i]['user'], style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))), // 글자 포인트 확대
+        leading: CircleAvatar(radius: 16, backgroundColor: d.savingsHistory[i]['user'] == "A" ? Colors.blue : Colors.green, child: Text(d.savingsHistory[i]['user'], style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
         title: Text("${d.savingsHistory[i]['date']} | ${d.nf.format(d.savingsHistory[i]['amount'])}원"),
         onTap: () => _editSavingDlg(context, d, i),
       )))
     ]);
   }
-
-  Widget _savingCard(String user, int current, int goal, double p, Color c) {
-    return Column(children: [
-      CircleAvatar(radius: 28, backgroundColor: c, child: Text(user, style: const TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.bold))), // 이모티콘 글자 확대
-      const SizedBox(height: 4), Text("${(p*100).toInt()}%", style: TextStyle(color: c, fontWeight: FontWeight.bold)),
-      LinearProgressIndicator(value: p, minHeight: 25, color: c, backgroundColor: c.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-      Text("${NumberFormat('#,###').format(current)}", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-      Text("목표: ${NumberFormat('#,###').format(goal)}", style: const TextStyle(fontSize: 9, color: Colors.grey)), // 비대칭 목표 표시
-    ]);
-  }
 }
 
-// 위젯 보조 함수들
+// 위젯 및 다이얼로그 헬퍼
 Widget _summaryBox(List<Widget> c) => Container(padding: const EdgeInsets.all(10), decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.black12))), child: Column(children: c));
 Widget _row(String l, int v, Color c, {bool b = false}) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(l, style: TextStyle(color: c, fontSize: 11, fontWeight: b ? FontWeight.bold : null)), Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b ? 16 : 14))]);
 
@@ -358,7 +352,7 @@ void _addCardDlg(BuildContext context, AccountData d) {
       }),
       TextField(decoration: const InputDecoration(labelText: "사용내역"), onChanged: (v) => desc = v),
       TextField(decoration: const InputDecoration(labelText: "금액"), keyboardType: TextInputType.number, onChanged: (v) => amt = int.tryParse(v) ?? 0),
-      DropdownButton<String>(value: brand, isExpanded: true, items: ["우리","현대","KB","삼성"].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setS(() => brand = v!)),
+      DropdownButton<String>(value: brand, isExpanded: true, items: ["우리","현대","KB","삼성","LG"].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setS(() => brand = v!)),
       SwitchListTile(title: const Text("회비여부"), value: isClub, onChanged: (v) => setS(() => isClub = v)),
       TextField(decoration: const InputDecoration(labelText: "비고"), onChanged: (v) => note = v),
     ])),
