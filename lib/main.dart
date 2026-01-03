@@ -12,7 +12,7 @@ import 'package:share_plus/share_plus.dart';
 void main() => runApp(
       ChangeNotifierProvider<AccountData>(
         create: (context) => AccountData(),
-        child: const MyPremiumApp(), // 클래스 명칭을 일치시켰습니다.
+        child: const MyPremiumApp(),
       ),
     );
 
@@ -32,7 +32,7 @@ class AccountData extends ChangeNotifier {
 
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
-    String? raw = prefs.getString('account_final_v2');
+    String? raw = prefs.getString('account_final_v3');
     if (raw != null) storage = jsonDecode(raw);
     loadMonth(selectedMonth);
   }
@@ -64,10 +64,9 @@ class AccountData extends ChangeNotifier {
   void _save() async {
     storage[selectedMonth] = {'income':income,'deduction':deduction,'fixedExp':fixedExp,'variableExp':variableExp,'childExp':childExp,'cardLogs':cardLogs};
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('account_final_v2', jsonEncode(storage));
+    prefs.setString('account_final_v3', jsonEncode(storage));
   }
 
-  // excel 2.1.0 안정 버전 문법 적용
   Future<void> exportToExcel() async {
     var excel = Excel.createExcel();
     Sheet sheet = excel[excel.getDefaultSheet()!];
