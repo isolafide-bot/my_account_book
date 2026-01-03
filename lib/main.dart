@@ -37,7 +37,7 @@ class AccountData extends ChangeNotifier {
 
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
-    String? raw = prefs.getString('ultimate_final_perfect_final_v1');
+    String? raw = prefs.getString('ultimate_final_perfect_final_v2');
     if (raw != null) storage = jsonDecode(raw);
     loadMonth(selectedMonth);
   }
@@ -45,7 +45,7 @@ class AccountData extends ChangeNotifier {
   void loadMonth(String month) {
     selectedMonth = month;
     var d = storage[month] ?? {};
-    income = Map<String, int>.from(d['income'] ?? {'기본급':0,'장기근속수당':0,'시간외근무수당':0,'가족수당':0,'식대보조비':0,'대우수당':0,'직무수행급':0,'성과급':0,'임금인상분':0,'기타1':0,'기타2':0,'기타3':0});
+    income = Map<String, int>.from(d['income'] ?? {'기본급':0,'장기근속수당':0,'시간외근무수당':0,'가족수당':0,'식대보조비':0,'대우수당':0,'직무수행급':0,'성과급':0,'성과금':0,'기타1':0,'기타2':0,'기타3':0});
     deduction = Map<String, int>.from(d['deduction'] ?? {'갑근세':0,'주민세':0,'건강보험료':0,'고용보험료':0,'국민연금':0,'요양보험':0,'식권구입비':0,'노동조합비':0,'환상성금':0,'아동발달지원계좌':0,'교양활동반회비':0,'기타1':0,'기타2':0,'기타3':0});
     fixedExp = Map<String, int>.from(d['fixedExp'] ?? {'KB보험':133221,'삼성생명':167226,'주택화재보험':24900,'한화보험':28650,'변액연금':200000,'일산':300000,'암사동':300000,'주택청약':100000,'사촌모임회비':30000,'용돈':500000});
     variableExp = Map<String, int>.from(d['variableExp'] ?? {'십일조':0,'대출원리금':0,'연금저축':0,'IRP':0,'식비':0,'교통비':0,'관리비':0,'도시가스':0,'하이패스':0,'통신비':0});
@@ -78,7 +78,7 @@ class AccountData extends ChangeNotifier {
     storage[selectedMonth] = {'income':income,'deduction':deduction,'fixedExp':fixedExp,'variableExp':variableExp,'childExp':childExp,'cardLogs':cardLogs};
     storage['savingsHistory'] = savingsHistory;
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('ultimate_final_perfect_final_v1', jsonEncode(storage));
+    prefs.setString('ultimate_final_perfect_final_v2', jsonEncode(storage));
   }
 
   int get totalA => savingsHistory.where((h) => h['user'] == "A").fold(0, (sum, item) => sum + (item['amount'] as int));
@@ -112,6 +112,7 @@ class _MainScaffoldState extends State<MainScaffold> with SingleTickerProviderSt
     final d = context.watch<AccountData>();
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
         title: _tab.index >= 3 ? Text(_tab.index == 3 ? "데이터 분석" : "저축 리포트") : ActionChip(
           label: Text(d.selectedMonth),
           onPressed: () async {
@@ -119,14 +120,19 @@ class _MainScaffoldState extends State<MainScaffold> with SingleTickerProviderSt
             if (p != null) d.loadMonth(DateFormat('yyyy-MM').format(p));
           },
         ),
-        bottom: TabBar(controller: _tab, isScrollable: true, tabs: const [Tab(text: "수입"), Tab(text: "지출"), Tab(text: "카드"), Tab(text: "통계"), Tab(text: "저축")]),
+        bottom: TabBar(
+          controller: _tab,
+          isScrollable: false, // 중앙 정렬을 위해 false
+          tabAlignment: TabAlignment.center, // 탭 중앙 정렬 추가
+          tabs: const [Tab(text: "수입"), Tab(text: "지출"), Tab(text: "카드"), Tab(text: "통계"), Tab(text: "저축")],
+        ),
       ),
       body: TabBarView(controller: _tab, children: [const TabInc(), const TabExp(), const TabCard(), const TabStatsSmart(), const TabSaving()]),
     );
   }
 }
 
-// 1 & 2. 수입/지출: 대분류 하단 여백(8px) 추가, 세부항목-금액 여백 확보
+// 촘촘한 세부항목 간격 및 잘림 방지 로직 적용
 Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d) {
   return Column(children: [
     Container(
@@ -135,19 +141,23 @@ Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d
       width: double.infinity, 
       child: Text(t, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 11))
     ),
-    const SizedBox(height: 8), // 대분류와 세부항목 사이의 여백 추가
+    const SizedBox(height: 6), 
     Expanded(child: ListView(padding: const EdgeInsets.symmetric(horizontal: 2), children: data.keys.map((k) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 2), // 세부항목 간 좁은 여백
+        padding: const EdgeInsets.only(bottom: 1), // 항목 간 여백 최소화 (반으로 줄임)
         child: SizedBox(
-          height: 46,
+          height: 44, // 높이 소폭 조정
           child: TextField(
             textAlign: TextAlign.right, keyboardType: TextInputType.number,
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
             decoration: InputDecoration(
-              labelText: k, labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700), // 글자 포인트 확대
-              isDense: true, border: const OutlineInputBorder(), suffixText: '원',
-              contentPadding: const EdgeInsets.only(left: 15, right: 8) // 항목명과 금액 사이 여백 확대
+              labelText: k, 
+              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              floatingLabelBehavior: FloatingLabelBehavior.always, // 레이블 고정으로 잘림 방지
+              isDense: true, 
+              border: const OutlineInputBorder(), 
+              suffixText: '원',
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10) 
             ),
             controller: TextEditingController(text: d.nf.format(data[k])),
             onSubmitted: (v) => d.updateVal(cat, k, int.tryParse(v.replaceAll(',', '')) ?? 0),
@@ -223,7 +233,7 @@ class TabCard extends StatelessWidget {
             final log = d.cardLogs[i];
             if (log['date'] != lastDate) { shade = !shade; lastDate = log['date']; }
             return Container(
-              color: shade ? Colors.orangeAccent.withOpacity(0.15) : Colors.white, // 산뜻한 귤색 음영
+              color: shade ? Colors.orangeAccent.withOpacity(0.15) : Colors.white,
               child: ListTile(dense: true, title: Text("${log['date'].substring(5)} | ${log['desc']} (${log['card']})"), trailing: Text("${d.nf.format(log['amt'])}원", style: const TextStyle(fontWeight: FontWeight.bold)), onTap: () => _showNote(context, log['note'])),
             );
           },
@@ -234,7 +244,6 @@ class TabCard extends StatelessWidget {
   }
 }
 
-// 3. 통계: 세련된 그라데이션 막대 및 조회 방식
 class TabStatsSmart extends StatefulWidget {
   const TabStatsSmart({super.key});
   @override State<TabStatsSmart> createState() => _TabStatsSmartState();
@@ -313,7 +322,6 @@ class _TabStatsSmartState extends State<TabStatsSmart> {
   }
 }
 
-// 4. 저축: 비대칭 목표 및 ✨ 누적 효과
 class TabSaving extends StatelessWidget {
   const TabSaving({super.key});
   @override Widget build(BuildContext context) {
@@ -321,12 +329,21 @@ class TabSaving extends StatelessWidget {
     double pA = (d.totalA / d.goalA).clamp(0.0, 1.0);
     double pB = (d.totalB / d.goalB).clamp(0.0, 1.0);
     return Column(children: [
+      // 저축 통합 박스 확대 및 강조
       Container(
-        margin: const EdgeInsets.all(16), padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.orangeAccent.withOpacity(0.2), blurRadius: 10)]),
+        width: double.infinity,
+        margin: const EdgeInsets.all(20), 
+        padding: const EdgeInsets.symmetric(vertical: 25, horizontal: 20), // 박스 크기 확대
+        decoration: BoxDecoration(
+          color: Colors.white, 
+          borderRadius: BorderRadius.circular(25), // 모서리 곡률 확대
+          border: Border.all(color: Colors.orangeAccent.withOpacity(0.5), width: 2),
+          boxShadow: [BoxShadow(color: Colors.orangeAccent.withOpacity(0.2), blurRadius: 15, spreadRadius: 2)]
+        ),
         child: Column(children: [
-          const Text("✨ 전체 통합 누적 금액 ✨", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange)),
-          Text("${d.nf.format(d.totalA + d.totalB)}원", style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.indigo)),
+          const Text("✨ 전체 통합 누적 금액 ✨", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orange)),
+          const SizedBox(height: 10),
+          Text("${d.nf.format(d.totalA + d.totalB)}원", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.indigo, letterSpacing: 1.5)),
         ]),
       ),
       Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Row(children: [
@@ -342,7 +359,7 @@ class TabSaving extends StatelessWidget {
           Transform.scale(scaleX: -1, child: LinearProgressIndicator(value: pB, minHeight: 25, color: Colors.green, backgroundColor: Colors.green.shade50, borderRadius: BorderRadius.circular(10)))
         ])),
       ])),
-      const SizedBox(height: 12),
+      const SizedBox(height: 15),
       Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [ElevatedButton(onPressed: () => _savingDlg(context, d, "A"), child: const Text("A 입금")), ElevatedButton(onPressed: () => _savingDlg(context, d, "B"), child: const Text("B 입금"))]),
       Expanded(child: ListView.builder(itemCount: d.savingsHistory.length, itemBuilder: (ctx, i) => ListTile(
         leading: CircleAvatar(radius: 16, backgroundColor: d.savingsHistory[i]['user'] == "A" ? Colors.blue : Colors.green, child: Text(d.savingsHistory[i]['user'], style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
@@ -354,14 +371,14 @@ class TabSaving extends StatelessWidget {
 }
 
 Widget _summaryBox(List<Widget> c) => Container(
-  padding: const EdgeInsets.fromLTRB(15, 10, 15, 15), 
+  padding: const EdgeInsets.fromLTRB(15, 12, 15, 20), 
   decoration: BoxDecoration(color: Colors.white, border: const Border(top: BorderSide(color: Colors.black12)), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]), 
   child: Column(children: c)
 );
 
 Widget _row(String l, int v, Color c, {bool b = false}) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
   Text(l, style: TextStyle(color: c, fontSize: 11, fontWeight: b ? FontWeight.bold : null)), 
-  Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b ? 19 : 14))
+  Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b ? 20 : 15))
 ]);
 
 void _savingDlg(BuildContext context, AccountData d, String user) {
