@@ -28,7 +28,7 @@ class AccountData extends ChangeNotifier {
 
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
-    String? raw = prefs.getString('account_final_stable');
+    String? raw = prefs.getString('account_final_v6');
     if (raw != null) storage = jsonDecode(raw);
     loadMonth(selectedMonth);
   }
@@ -60,19 +60,24 @@ class AccountData extends ChangeNotifier {
   void _save() async {
     storage[selectedMonth] = {'income':income,'deduction':deduction,'fixedExp':fixedExp,'variableExp':variableExp,'childExp':childExp,'cardLogs':cardLogs};
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('account_final_stable', jsonEncode(storage));
+    prefs.setString('account_final_v6', jsonEncode(storage));
   }
 
   String f(num v) => nf.format(v);
   int get sInc => income.values.fold(0, (a, b) => a + b);
   int get sDed => deduction.values.fold(0, (a, b) => a + b);
-  int get sExp {
-    int total = 0;
-    total += fixedExp.values.fold(0, (a, b) => a + b);
-    total += variableExp.values.fold(0, (a, b) => a + b);
-    total += childExp.values.fold(0, (a, b) => a + b);
-    total += cardLogs.fold(0, (a, b) => a + (b['amt'] as int));
-    return total;
+  int get sFix => fixedExp.values.fold(0, (a, b) => a + b);
+  int get sVar => variableExp.values.fold(0, (a, b) => a + b);
+  int get sChi => childExp.values.fold(0, (a, b) => a + b);
+  int get sCardTotal => cardLogs.fold(0, (a, b) => a + (b['amt'] as int));
+
+  Map<String, int> get cardBrandTotals {
+    Map<String, int> totals = {};
+    for (var log in cardLogs) {
+      String brand = log['card'];
+      totals[brand] = (totals[brand] ?? 0) + (log['amt'] as int);
+    }
+    return totals;
   }
 }
 
@@ -103,7 +108,7 @@ class _MainScaffoldState extends State<MainScaffold> with SingleTickerProviderSt
     return Scaffold(
       appBar: AppBar(
         title: ActionChip(
-          avatar: const Icon(Icons.calendar_month, size: 18),
+          avatar: const Icon(Icons.calendar_month, size: 16),
           label: Text(d.selectedMonth, style: const TextStyle(fontWeight: FontWeight.bold)),
           onPressed: () async {
             DateTime? p = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2024), lastDate: DateTime(2030));
@@ -128,12 +133,12 @@ class TabInc extends StatelessWidget {
         const VerticalDivider(width: 1),
         Expanded(child: _list("공제 내역", d.deduction, 'ded', Colors.redAccent, d)),
       ])),
-      Container(padding: const EdgeInsets.all(8), color: Colors.indigo.withOpacity(0.05), child: Column(children: [
-        _row("세전", d.sInc, Colors.blue),
-        _row("공제", d.sDed, Colors.red),
-        const Divider(height: 10),
-        _row("실수령액", d.sInc - d.sDed, Colors.indigo, b: true),
-      ]))
+      _summaryBox([
+        _row("세전 총액", d.sInc, Colors.blue),
+        _row("공제 총액", d.sDed, Colors.red),
+        const Divider(),
+        _row("세후 수입금액", d.sInc - d.sDed, Colors.indigo, b: true),
+      ])
     ]);
   }
 }
@@ -147,9 +152,15 @@ class TabExp extends StatelessWidget {
       Expanded(child: Row(children: [
         Expanded(child: _list("고정지출", d.fixedExp, 'fix', Colors.teal, d)),
         Expanded(child: _list("변동지출", d.variableExp, 'var', Colors.orange, d)),
-        Expanded(child: _list("자녀", d.childExp, 'chi', Colors.purple, d)),
+        Expanded(child: _list("변동(자녀)", d.childExp, 'chi', Colors.purple, d)),
       ])),
-      _row("지출 총합계", d.sExp, Colors.deepOrange, b: true),
+      _summaryBox([
+        _row("고정지출 합계", d.sFix, Colors.teal),
+        _row("변동지출 합계", d.sVar, Colors.orange),
+        _row("자녀지출 합계", d.sChi, Colors.purple),
+        const Divider(),
+        _row("지출 총 합계", d.sFix + d.sVar + d.sChi, Colors.deepOrange, b: true),
+      ])
     ]);
   }
 }
@@ -159,30 +170,35 @@ class TabCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final d = context.watch<AccountData>();
-    return Scaffold(
-      floatingActionButton: FloatingActionButton.small(onPressed: () => _addCardDlg(context, d), child: const Icon(Icons.add)),
-      body: ListView.separated(
-        itemCount: d.cardLogs.length,
-        separatorBuilder: (ctx, i) => const Divider(height: 1),
-        itemBuilder: (ctx, i) {
-          final log = d.cardLogs[i];
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Row(
-              children: [
-                Text("${i+1}", style: const TextStyle(fontSize: 9, color: Colors.grey)), // 연번 크기 축소
-                const SizedBox(width: 8),
-                Expanded(child: Text("${log['date'].toString().substring(5)} | ${log['desc']} | ${log['card']}", 
-                  style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)), // 한 줄 정렬
-                Text(d.nf.format(log['amt']), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.indigo)),
-                const Text("원", style: TextStyle(fontSize: 10)),
-                IconButton(icon: const Icon(Icons.close, size: 16, color: Colors.red), onPressed: () => d.delCard(i)),
-              ],
-            ),
-          );
-        },
+    return Column(children: [
+      Expanded(
+        child: Scaffold(
+          floatingActionButton: FloatingActionButton.small(onPressed: () => _addCardDlg(context, d), child: const Icon(Icons.add)),
+          body: ListView.separated(
+            itemCount: d.cardLogs.length,
+            separatorBuilder: (ctx, i) => const Divider(height: 1),
+            itemBuilder: (ctx, i) {
+              final log = d.cardLogs[i];
+              return ListTile(
+                dense: true,
+                onTap: () => _showNote(context, log['note']),
+                leading: Text("${i+1}", style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                title: Text("${log['date'].toString().substring(5)} | ${log['desc']} | ${log['card']}", style: const TextStyle(fontSize: 12)),
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(d.nf.format(log['amt']), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                  IconButton(icon: const Icon(Icons.close, size: 16, color: Colors.red), onPressed: () => d.delCard(i)),
+                ]),
+              );
+            },
+          ),
+        ),
       ),
-    );
+      _summaryBox([
+        ...d.cardBrandTotals.entries.map((e) => _row(e.key, e.value, Colors.blueGrey)),
+        const Divider(),
+        _row("카드 사용 총액", d.sCardTotal, Colors.indigo, b: true),
+      ])
+    ]);
   }
 }
 
@@ -192,63 +208,98 @@ class TabChart extends StatefulWidget {
 }
 
 class _TabChartState extends State<TabChart> {
-  String mode = "급여";
+  String year = DateFormat('yyyy').format(DateTime.now());
   @override
   Widget build(BuildContext context) {
     final d = context.watch<AccountData>();
-    List<BarChartGroupData> groups = [];
-    Map<String, int> data = mode == "급여" ? d.income : (mode == "지출" ? d.fixedExp : {});
-    int i = 0;
-    data.forEach((k, v) { if(v > 0) groups.add(BarChartGroupData(x: i++, barRods: [BarChartRodData(toY: v.toDouble(), color: Colors.indigo, width: 14)])); });
-
-    return Padding(padding: const EdgeInsets.all(20), child: Column(children: [
-      SegmentedButton<String>(
-        segments: const [ButtonSegment(value: "급여", label: Text("급여")), ButtonSegment(value: "지출", label: Text("지출"))],
-        selected: {mode},
-        onSelectionChanged: (s) => setState(() => mode = s.first),
+    return Column(children: [
+      Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text("$year년 연간 통계 (준비중)", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ),
-      const SizedBox(height: 30),
-      Expanded(child: BarChart(BarChartData(barGroups: groups, borderData: FlBorderData(show: false)))),
-      const Text("항목별 월별 현황"),
-    ]));
+      const Expanded(child: Center(child: Icon(Icons.bar_chart, size: 100, color: Colors.black12))),
+    ]);
   }
 }
 
 Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d) {
+  int idx = 0;
   return Column(children: [
-    Container(padding: const EdgeInsets.symmetric(vertical: 2), color: c.withOpacity(0.1), width: double.infinity, child: Text(t, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 10))),
-    Expanded(child: ListView(padding: const EdgeInsets.all(2), children: data.keys.map((k) => Container(
-      height: 38, // 칸 높이 축소
-      margin: const EdgeInsets.only(bottom: 2),
-      child: TextField(
-        textAlign: TextAlign.right,
-        keyboardType: TextInputType.number,
-        decoration: InputDecoration(labelText: k, labelStyle: const TextStyle(fontSize: 9), isDense: true, border: const OutlineInputBorder(), suffixText: '원'),
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold), // 금액 폰트 확대
-        controller: TextEditingController(text: d.nf.format(data[k])),
-        onSubmitted: (v) => d.updateVal(cat, k, int.tryParse(v.replaceAll(',', '')) ?? 0),
-      ),
-    )).toList()))
+    Container(padding: const EdgeInsets.symmetric(vertical: 6), color: c.withOpacity(0.1), width: double.infinity, child: Text(t, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 11))),
+    Expanded(child: ListView(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8), children: data.keys.map((k) {
+      final isEven = idx++ % 2 == 0;
+      return Container(
+        height: 48,
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: isEven ? Colors.white : Colors.grey.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.black12, width: 0.5),
+        ),
+        child: TextField(
+          textAlign: TextAlign.right,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: k, 
+            labelStyle: const TextStyle(fontSize: 12, color: Colors.black87, fontWeight: FontWeight.w500), 
+            isDense: true, border: InputBorder.none, suffixText: '원',
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
+          ),
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.indigo),
+          controller: TextEditingController(text: d.nf.format(data[k])),
+          onSubmitted: (v) => d.updateVal(cat, k, int.tryParse(v.replaceAll(',', '')) ?? 0),
+        ),
+      );
+    }).toList()))
   ]);
+}
+
+Widget _summaryBox(List<Widget> children) {
+  return Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(color: Colors.white, border: const Border(top: BorderSide(color: Colors.black12)), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
+    child: Column(children: children),
+  );
 }
 
 Widget _row(String l, int v, Color c, {bool b = false}) {
-  return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-    Text(l, style: TextStyle(color: c, fontWeight: b ? FontWeight.bold : null, fontSize: 11)),
-    Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b ? 18 : 14)),
-  ]);
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 2),
+    child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+      Text(l, style: TextStyle(color: c, fontWeight: b ? FontWeight.bold : null, fontSize: 11)),
+      Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b ? 18 : 14)),
+    ]),
+  );
 }
 
 void _addCardDlg(BuildContext context, AccountData d) {
-  String card = "우리카드"; String desc = ""; int amt = 0; bool club = false;
+  String card = "우리카드"; String desc = ""; int amt = 0; bool club = false; String note = "";
+  DateTime pickedDate = DateTime.now();
   showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
-    title: const Text("카드 추가", style: TextStyle(fontSize: 16)),
+    title: const Text("카드 추가"),
     content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      ListTile(
+        title: Text("날짜: ${DateFormat('yyyy-MM-dd').format(pickedDate)}"),
+        trailing: const Icon(Icons.edit_calendar),
+        onTap: () async {
+          DateTime? p = await showDatePicker(context: context, initialDate: pickedDate, firstDate: DateTime(2024), lastDate: DateTime(2030));
+          if (p != null) setS(() => pickedDate = p);
+        },
+      ),
       DropdownButton<String>(isExpanded: true, value: card, items: ["우리카드","현대카드","KB카드","LG카드","삼성카드","신한카드"].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setS(() => card = v!)),
       TextField(decoration: const InputDecoration(labelText: "내역"), onChanged: (v) => desc = v),
       TextField(decoration: const InputDecoration(labelText: "금액"), keyboardType: TextInputType.number, onChanged: (v) => amt = int.tryParse(v) ?? 0),
+      TextField(decoration: const InputDecoration(labelText: "비고"), onChanged: (v) => note = v),
       SwitchListTile(title: const Text("회비여부"), value: club, onChanged: (v) => setS(() => club = v)),
     ])),
-    actions: [TextButton(onPressed: () { d.addCard({'date': DateFormat('yyyy-MM-dd').format(DateTime.now()), 'desc': desc, 'amt': amt, 'card': card, 'club': club}); Navigator.pop(ctx); }, child: const Text("저장"))],
+    actions: [TextButton(onPressed: () {
+      d.addCard({'date': DateFormat('yyyy-MM-dd').format(pickedDate), 'desc': desc, 'amt': amt, 'card': card, 'club': club, 'note': note});
+      Navigator.pop(ctx);
+    }, child: const Text("저장"))],
   )));
+}
+
+void _showNote(BuildContext context, String? note) {
+  if (note == null || note.isEmpty) return;
+  showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text("비고 내역"), content: Text(note), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("확인"))]));
 }
