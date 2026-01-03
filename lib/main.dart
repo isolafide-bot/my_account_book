@@ -26,13 +26,16 @@ class AccountData extends ChangeNotifier {
   List<Map<String, dynamic>> cardLogs = [];
   List<Map<String, dynamic>> savingsHistory = [];
   int savingsGoal = 64000000;
-  Set<String> selectedStatsItems = {'기본급'};
+
+  // 통계 필터 상태
+  String statsCategory = "수입"; 
+  Set<String> checkedItems = {};
 
   AccountData() { _init(); }
 
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
-    String? raw = prefs.getString('ultimate_master_v50');
+    String? raw = prefs.getString('master_v60_final');
     if (raw != null) storage = jsonDecode(raw);
     savingsGoal = storage['savingsGoal'] ?? 64000000;
     loadMonth(selectedMonth);
@@ -41,11 +44,11 @@ class AccountData extends ChangeNotifier {
   void loadMonth(String month) {
     selectedMonth = month;
     var d = storage[month] ?? {};
-    income = Map<String, int>.from(d['income'] ?? {'기본급':0,'장기근속수당':0,'성과급':0});
-    deduction = Map<String, int>.from(d['deduction'] ?? {'갑근세':0,'국민연금':0});
-    fixedExp = Map<String, int>.from(d['fixedExp'] ?? {'보험':0,'용돈':0});
-    variableExp = Map<String, int>.from(d['variableExp'] ?? {'식비':0,'교통비':0});
-    childExp = Map<String, int>.from(d['childExp'] ?? {'교육비':0,'주식':0});
+    income = Map<String, int>.from(d['income'] ?? {'기본급':0,'장기근속수당':0,'시간외근무수당':0,'가족수당':0,'식대보조비':0,'대우수당':0,'직무수행급':0,'성과급':0,'임금인상분':0,'기타1':0,'기타2':0,'기타3':0});
+    deduction = Map<String, int>.from(d['deduction'] ?? {'갑근세':0,'주민세':0,'건강보험료':0,'고용보험료':0,'국민연금':0,'요양보험':0,'식권구입비':0,'노동조합비':0,'환상성금':0,'아동발달지원계좌':0,'교양활동반회비':0,'기타1':0,'기타2':0,'기타3':0});
+    fixedExp = Map<String, int>.from(d['fixedExp'] ?? {'KB보험':133221,'삼성생명':167226,'주택화재보험':24900,'한화보험':28650,'변액연금':200000,'일산':300000,'암사동':300000,'주택청약':100000,'사촌모임회비':30000,'용돈':500000});
+    variableExp = Map<String, int>.from(d['variableExp'] ?? {'십일조':0,'대출원리금':0,'연금저축':0,'IRP':0,'식비':0,'교통비':0,'관리비':0,'도시가스':0,'하이패스':0,'통신비':0});
+    childExp = Map<String, int>.from(d['childExp'] ?? {'교육비(똘1)':0,'교육비(똘2)':0,'주식(똘1)':0,'주식(똘2)':0,'청약(똘1)':0,'청약(똘2)':0,'교통비(똘1)':0,'교통비(똘2)':0});
     cardLogs = List<Map<String, dynamic>>.from(d['cardLogs'] ?? []);
     savingsHistory = List<Map<String, dynamic>>.from(storage['savingsHistory'] ?? []);
     notifyListeners();
@@ -67,6 +70,7 @@ class AccountData extends ChangeNotifier {
 
   void addCardLog(String desc, int amt, String brand, DateTime date, bool isClub, String note) {
     cardLogs.add({'date': DateFormat('yyyy-MM-dd').format(date), 'desc': desc, 'amt': amt, 'card': brand, 'isClub': isClub, 'note': note});
+    cardLogs.sort((a, b) => b['date'].compareTo(a['date']));
     _save(); notifyListeners();
   }
 
@@ -75,26 +79,23 @@ class AccountData extends ChangeNotifier {
     storage['savingsHistory'] = savingsHistory;
     storage['savingsGoal'] = savingsGoal;
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('ultimate_master_v50', jsonEncode(storage));
+    prefs.setString('master_v60_final', jsonEncode(storage));
   }
 
+  int get sInc => income.values.fold(0, (a, b) => a + b);
+  int get sDed => deduction.values.fold(0, (a, b) => a + b);
+  int get sFix => fixedExp.values.fold(0, (a, b) => a + b);
+  int get sVar => variableExp.values.fold(0, (a, b) => a + b);
+  int get sChi => childExp.values.fold(0, (a, b) => a + b);
   int get totalA => savingsHistory.where((h) => h['user'] == "A").fold(0, (sum, item) => sum + (item['amount'] as int));
   int get totalB => savingsHistory.where((h) => h['user'] == "B").fold(0, (sum, item) => sum + (item['amount'] as int));
-  
-  // 에러가 났던 합계 계산을 명확하게 int로 수정
-  int getSum(String month, String cat) {
-    var d = storage[month] ?? {};
-    if (cat == 'card') return (d['cardLogs'] as List? ?? []).fold(0, (a, b) => a + (b['amt'] as int));
-    Map data = d[cat] ?? {};
-    return data.values.fold(0, (a, b) => a + (b as int));
-  }
 }
 
 class MyPremiumApp extends StatelessWidget {
   const MyPremiumApp({super.key});
   @override Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
-    theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo),
+    theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.orange),
     home: const MainScaffold(),
   );
 }
@@ -115,42 +116,49 @@ class _MainScaffoldState extends State<MainScaffold> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     final d = context.watch<AccountData>();
-    bool showYearFilter = _tab.index == 3;
-    bool showNothing = _tab.index == 4;
+    bool hideHeader = _tab.index >= 3;
     return Scaffold(
       appBar: AppBar(
-        title: showYearFilter ? DropdownButton<String>(value: d.selectedYear, items: ["2025","2026"].map((y)=>DropdownMenuItem(value:y, child:Text("$y년 통계"))).toList(), onChanged:(v){if(v!=null)setState(()=>d.selectedYear=v);})
-             : showNothing ? const Text("6,400만원 저축 목표") : ActionChip(label: Text(d.selectedMonth), onPressed: () async {
-                DateTime? p = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2024), lastDate: DateTime(2030));
-                if (p != null) d.loadMonth(DateFormat('yyyy-MM').format(p));
-             }),
+        title: hideHeader ? Text(_tab.index == 3 ? "통계 분석" : "저축 현황") : ActionChip(
+          avatar: const Icon(Icons.calendar_month, size: 16),
+          label: Text(d.selectedMonth),
+          onPressed: () async {
+            DateTime? p = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2024), lastDate: DateTime(2030));
+            if (p != null) d.loadMonth(DateFormat('yyyy-MM').format(p));
+          },
+        ),
         actions: [if(_tab.index == 4) IconButton(icon: const Icon(Icons.settings), onPressed: () => _setGoalDlg(context, d))],
-        bottom: TabBar(controller: _tab, isScrollable: true, tabs: const [Tab(text:"수입"), Tab(text:"지출"), Tab(text:"카드"), Tab(text:"통계"), Tab(text:"저축")]),
+        bottom: TabBar(controller: _tab, isScrollable: true, tabs: const [Tab(text: "수입"), Tab(text: "지출"), Tab(text: "카드"), Tab(text: "통계"), Tab(text: "저축")]),
       ),
       body: TabBarView(controller: _tab, children: [const TabInc(), const TabExp(), const TabCard(), const TabStatsLandscape(), const TabSaving()]),
     );
   }
 }
 
-// 수입/지출 2줄 레이아웃 (가독성 100%)
+// 초기 버전의 깔끔한 리스트 레이아웃 복구
 Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d) {
   return Column(children: [
-    Container(padding: const EdgeInsets.all(6), color: c.withOpacity(0.1), width: double.infinity, child: Text(t, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 11))),
-    Expanded(child: ListView(padding: const EdgeInsets.all(8), children: data.keys.map((k) => Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.black12)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(k, style: const TextStyle(fontSize: 11, color: Colors.black54)),
-        TextField(
-          textAlign: TextAlign.right, keyboardType: TextInputType.number,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.indigo),
-          decoration: const InputDecoration(border: InputBorder.none, isDense: true, suffixText: " 원"),
-          controller: TextEditingController(text: d.nf.format(data[k])),
-          onSubmitted: (v) => d.updateVal(cat, k, int.tryParse(v.replaceAll(',', '')) ?? 0),
-        )
-      ]),
-    )).toList()))
+    Container(padding: const EdgeInsets.all(4), color: c.withOpacity(0.1), width: double.infinity, child: Text(t, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 11))),
+    Expanded(child: ListView(padding: const EdgeInsets.all(4), children: data.keys.map((k) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: SizedBox(
+          height: 36,
+          child: TextField(
+            textAlign: TextAlign.right,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            decoration: InputDecoration(
+              labelText: k, labelStyle: const TextStyle(fontSize: 10),
+              isDense: true, border: const OutlineInputBorder(), suffixText: '원',
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8)
+            ),
+            controller: TextEditingController(text: d.nf.format(data[k])),
+            onSubmitted: (v) => d.updateVal(cat, k, int.tryParse(v.replaceAll(',', '')) ?? 0),
+          ),
+        ),
+      );
+    }).toList()))
   ]);
 }
 
@@ -158,11 +166,9 @@ class TabInc extends StatelessWidget {
   const TabInc({super.key});
   @override Widget build(BuildContext context) {
     final d = context.watch<AccountData>();
-    int sInc = d.income.values.fold(0, (a, b) => a + b);
-    int sDed = d.deduction.values.fold(0, (a, b) => a + b);
     return Column(children: [
-      Expanded(child: Row(children: [Expanded(child: _list("세전", d.income, 'inc', Colors.blue, d)), const VerticalDivider(width: 1), Expanded(child: _list("공제", d.deduction, 'ded', Colors.red, d))])),
-      _summaryBox([_row("세전 합계", sInc, Colors.blue), _row("공제 합계", sDed, Colors.red), const Divider(), _row("실수령액", sInc - sDed, Colors.indigo, b: true)])
+      Expanded(child: Row(children: [Expanded(child: _list("세전 수입", d.income, 'inc', Colors.blue, d)), const VerticalDivider(width: 1), Expanded(child: _list("공제 내역", d.deduction, 'ded', Colors.red, d))])),
+      _summaryBox([_row("세전 총액", d.sInc, Colors.blue), _row("공제 총액", d.sDed, Colors.red), const Divider(), _row("실수령액", d.sInc - d.sDed, Colors.indigo, b: true)])
     ]);
   }
 }
@@ -171,12 +177,19 @@ class TabExp extends StatelessWidget {
   const TabExp({super.key});
   @override Widget build(BuildContext context) {
     final d = context.watch<AccountData>();
-    int sFix = d.fixedExp.values.fold(0, (a,b)=>a+b);
-    int sVar = d.variableExp.values.fold(0, (a,b)=>a+b);
-    int sChi = d.childExp.values.fold(0, (a,b)=>a+b);
     return Column(children: [
-      Expanded(child: Row(children: [Expanded(child: _list("고정", d.fixedExp, 'fix', Colors.teal, d)), Expanded(child: _list("변동", d.variableExp, 'var', Colors.orange, d)), Expanded(child: _list("자녀", d.childExp, 'chi', Colors.purple, d))])),
-      _summaryBox([_row("고정 합계", sFix, Colors.teal), _row("변동 합계", sVar, Colors.orange), _row("자녀 합계", sChi, Colors.purple), const Divider(), _row("지출 총합", sFix+sVar+sChi, Colors.deepOrange, b: true)])
+      Expanded(child: Row(children: [
+        Expanded(child: _list("고정지출", d.fixedExp, 'fix', Colors.teal, d)),
+        Expanded(child: _list("변동지출", d.variableExp, 'var', Colors.orange, d)),
+        Expanded(child: _list("자녀지출", d.childExp, 'chi', Colors.purple, d)),
+      ])),
+      _summaryBox([
+        _row("고정지출 합계", d.sFix, Colors.teal),
+        _row("변동지출 합계", d.sVar, Colors.orange),
+        _row("자녀지출 합계", d.sChi, Colors.purple),
+        const Divider(),
+        _row("지출 총 합계", d.sFix + d.sVar + d.sChi, Colors.deepOrange, b: true)
+      ])
     ]);
   }
 }
@@ -187,7 +200,7 @@ class TabCard extends StatelessWidget {
     final d = context.watch<AccountData>();
     String lastDate = ""; bool shade = false;
     Map<String, int> brandTotals = {};
-    for(var log in d.cardLogs) brandTotals[log['card']] = (brandTotals[log['card']] ?? 0) + (log['amt'] as int);
+    for (var log in d.cardLogs) brandTotals[log['card']] = (brandTotals[log['card']] ?? 0) + (log['amt'] as int);
 
     return Column(children: [
       Expanded(child: Scaffold(
@@ -195,14 +208,22 @@ class TabCard extends StatelessWidget {
         body: ListView.builder(itemCount: d.cardLogs.length, itemBuilder: (ctx, i) {
           final log = d.cardLogs[i];
           if (log['date'] != lastDate) { shade = !shade; lastDate = log['date']; }
-          return Container(color: shade ? Colors.grey.withOpacity(0.05) : Colors.white, child: ListTile(
-            dense: true, title: Text("${log['date'].substring(5)} | ${log['desc']} (${log['card']})"),
-            trailing: Text("${d.nf.format(log['amt'])}원", style: const TextStyle(fontWeight: FontWeight.bold)),
-            onTap: () => _showNote(context, log['note']),
-          ));
+          return Container(
+            color: shade ? Colors.orangeAccent.withOpacity(0.15) : Colors.white, // 귤색 음영
+            child: ListTile(
+              dense: true,
+              title: Text("${log['date'].substring(5)} | ${log['desc']} (${log['card']})"),
+              trailing: Text("${d.nf.format(log['amt'])}원", style: const TextStyle(fontWeight: FontWeight.bold)),
+              onTap: () => _showNote(context, log['note']),
+            ),
+          );
         }),
       )),
-      _summaryBox([...brandTotals.entries.map((e) => _row(e.key, e.value, Colors.blueGrey)), const Divider(), _row("총 카드 사용액", d.cardLogs.fold(0, (a,b)=>a+(b['amt'] as int)), Colors.indigo, b: true)])
+      _summaryBox([
+        ...brandTotals.entries.map((e) => _row(e.key, e.value, Colors.blueGrey)),
+        const Divider(),
+        _row("총 카드 사용액", d.cardLogs.fold(0, (a, b) => a + (b['amt'] as int)), Colors.indigo, b: true)
+      ])
     ]);
   }
 }
@@ -211,26 +232,38 @@ class TabStatsLandscape extends StatelessWidget {
   const TabStatsLandscape({super.key});
   @override Widget build(BuildContext context) {
     final d = context.watch<AccountData>();
+    List<String> items = [];
+    if (d.statsCategory == "수입") items = [...d.income.keys, ...d.deduction.keys];
+    else if (d.statsCategory == "지출") items = [...d.fixedExp.keys, ...d.variableExp.keys, ...d.childExp.keys];
+    else items = ["우리카드", "현대카드", "국민카드", "삼성카드"];
+
     return Column(children: [
-      const Text("항목 선택 후 12개월 추이 확인", style: TextStyle(fontSize: 12, color: Colors.grey)),
-      SizedBox(height: 50, child: ListView(scrollDirection: Axis.horizontal, children: [...d.income.keys, ...d.fixedExp.keys, ...d.variableExp.keys].map((k) => Padding(
+      Row(mainAxisAlignment: MainAxisAlignment.center, children: ["수입", "지출", "카드"].map((c) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: ChoiceChip(label: Text(c), selected: d.statsCategory == c, onSelected: (v) { d.statsCategory = c; d.checkedItems.clear(); d.notifyListeners(); }),
+      )).toList()),
+      SizedBox(height: 50, child: ListView(scrollDirection: Axis.horizontal, children: items.map((it) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: FilterChip(label: Text(k), selected: d.selectedStatsItems.contains(k), onSelected: (v){ if(v) d.selectedStatsItems.add(k); else d.selectedStatsItems.remove(k); d.notifyListeners(); }),
+        child: FilterChip(label: Text(it), selected: d.checkedItems.contains(it), onSelected: (v) { if(v) d.checkedItems.add(it); else d.checkedItems.remove(it); d.notifyListeners(); }),
       )).toList())),
-      Expanded(child: Padding(padding: const EdgeInsets.all(20), child: BarChart(BarChartData(
+      Expanded(child: Padding(padding: const EdgeInsets.fromLTRB(10, 20, 20, 20), child: BarChart(BarChartData(
         barGroups: List.generate(12, (i) {
-          String m = "${d.selectedYear}-${(i+1).toString().padLeft(2,'0')}";
+          DateTime now = DateTime.now();
+          String m = DateFormat('yyyy-MM').format(DateTime(now.year, now.month - (11 - i), 1));
           double sum = 0;
           var monthData = d.storage[m] ?? {};
-          d.selectedStatsItems.forEach((it) {
+          for (var it in d.checkedItems) {
             sum += (monthData['income']?[it] ?? 0).toDouble();
             sum += (monthData['fixedExp']?[it] ?? 0).toDouble();
-            sum += (monthData['variableExp']?[it] ?? 0).toDouble();
-          });
-          return BarChartGroupData(x: i, barRods: [BarChartRodData(toY: sum, color: Colors.indigo, width: 15)]);
+            if (d.statsCategory == "카드") {
+              List logs = monthData['cardLogs'] ?? [];
+              sum += logs.where((l) => l['card'] == it).fold(0.0, (s, l) => s + (l['amt'] as int));
+            }
+          }
+          return BarChartGroupData(x: i, barRods: [BarChartRodData(toY: sum, color: Colors.orangeAccent, width: 14, borderRadius: BorderRadius.circular(4))]);
         }),
-        titlesData: FlTitlesData(bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (v,m)=>Text("${v.toInt()+1}월", style:const TextStyle(fontSize:10))))),
-      ))))
+        titlesData: FlTitlesData(bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (v, m) => Text("${(DateTime.now().month - (11 - v.toInt()) + 11) % 12 + 1}월", style: const TextStyle(fontSize: 9))))),
+      )))),
     ]);
   }
 }
@@ -242,20 +275,17 @@ class TabSaving extends StatelessWidget {
     double progA = (d.totalA / (d.savingsGoal / 2)).clamp(0.0, 1.0);
     double progB = (d.totalB / (d.savingsGoal / 2)).clamp(0.0, 1.0);
     return Column(children: [
-      Padding(padding: const EdgeInsets.all(20), child: Row(children: [
-        Expanded(child: Column(children: [const Icon(Icons.person, color: Colors.blue), LinearProgressIndicator(value: progA, minHeight: 25, color: Colors.blue, backgroundColor: Colors.blue.shade50)])),
-        const SizedBox(width: 5, child: VerticalDivider()),
-        Expanded(child: Column(children: [const Icon(Icons.person, color: Colors.green), Transform.scale(scaleX: -1, child: LinearProgressIndicator(value: progB, minHeight: 25, color: Colors.green, backgroundColor: Colors.green.shade50))])),
+      Padding(padding: const EdgeInsets.all(16), child: Row(children: [
+        Expanded(child: Column(children: [CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.person, color: Colors.white)), LinearProgressIndicator(value: progA, minHeight: 25, color: Colors.blue, backgroundColor: Colors.blue.shade50)])),
+        const SizedBox(width: 4),
+        Expanded(child: Column(children: [CircleAvatar(backgroundColor: Colors.green, child: Icon(Icons.person_outline, color: Colors.white)), Transform.scale(scaleX: -1, child: LinearProgressIndicator(value: progB, minHeight: 25, color: Colors.green, backgroundColor: Colors.green.shade50))])),
       ])),
-      Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [Text("A: ${d.nf.format(d.totalA)}원"), Text("B: ${d.nf.format(d.totalB)}원")]),
-      const SizedBox(height: 10),
-      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
         ElevatedButton(onPressed: () => _savingDlg(context, d, "A"), child: const Text("A 저축")),
-        const SizedBox(width: 20),
         ElevatedButton(onPressed: () => _savingDlg(context, d, "B"), child: const Text("B 저축")),
       ]),
       Expanded(child: ListView.builder(itemCount: d.savingsHistory.length, itemBuilder: (ctx, i) => ListTile(
-        leading: CircleAvatar(backgroundColor: d.savingsHistory[i]['user']=="A"?Colors.blue:Colors.green, child: Text(d.savingsHistory[i]['user'], style: const TextStyle(color: Colors.white))),
+        leading: CircleAvatar(backgroundColor: d.savingsHistory[i]['user'] == "A" ? Colors.blue : Colors.green, child: Text(d.savingsHistory[i]['user'], style: const TextStyle(color: Colors.white, fontSize: 10))),
         title: Text("${d.savingsHistory[i]['date']} | ${d.nf.format(d.savingsHistory[i]['amount'])}원"),
         onTap: () => _editSavingDlg(context, d, i),
       )))
@@ -263,9 +293,9 @@ class TabSaving extends StatelessWidget {
   }
 }
 
-// 헬퍼 함수들 (에러 수정됨)
-Widget _summaryBox(List<Widget> ch) => Container(padding: const EdgeInsets.all(10), decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.black12))), child: Column(children: ch));
-Widget _row(String l, int v, Color c, {bool b = false}) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(l, style: TextStyle(color: c, fontSize: 11, fontWeight: b?FontWeight.bold:null)), Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b?16:14))]);
+// 유틸리티 함수들
+Widget _summaryBox(List<Widget> children) => Container(padding: const EdgeInsets.all(8), decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.black12))), child: Column(children: children));
+Widget _row(String l, int v, Color c, {bool b = false}) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(l, style: TextStyle(color: c, fontSize: 11, fontWeight: b ? FontWeight.bold : null)), Text("${NumberFormat('#,###').format(v)}원", style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: b ? 15 : 13))]);
 
 void _savingDlg(BuildContext context, AccountData d, String user) {
   int amt = 0; DateTime date = DateTime.now();
@@ -285,7 +315,7 @@ void _savingDlg(BuildContext context, AccountData d, String user) {
 void _editSavingDlg(BuildContext context, AccountData d, int i) {
   int amt = d.savingsHistory[i]['amount'];
   showDialog(context: context, builder: (ctx) => AlertDialog(
-    title: const Text("입금 내역 수정"),
+    title: const Text("내역 수정/삭제"),
     content: TextField(keyboardType: TextInputType.number, decoration: const InputDecoration(suffixText: "원"), controller: TextEditingController(text: amt.toString()), onChanged: (v) => amt = int.tryParse(v) ?? amt),
     actions: [
       TextButton(onPressed: () { d.savingsHistory.removeAt(i); d._save(); d.notifyListeners(); Navigator.pop(ctx); }, child: const Text("삭제", style: TextStyle(color: Colors.red))),
