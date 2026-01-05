@@ -33,7 +33,7 @@ class AccountData extends ChangeNotifier {
 
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
-    String? raw = prefs.getString('premium_final_v200');
+    String? raw = prefs.getString('premium_final_v210');
     if (raw != null) storage = jsonDecode(raw);
     loadMonth(selectedMonth);
   }
@@ -85,7 +85,7 @@ class AccountData extends ChangeNotifier {
     storage[selectedMonth] = {'income':income,'deduction':deduction,'fixedExp':fixedExp,'variableExp':variableExp,'childExp':childExp,'cardLogs':cardLogs};
     storage['savingsHistory'] = savingsHistory;
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('premium_final_v200', jsonEncode(storage));
+    prefs.setString('premium_final_v210', jsonEncode(storage));
   }
 
   int get totalA => savingsHistory.where((h) => h['user'] == "A").fold(0, (sum, item) => sum + (item['amount'] as int));
@@ -157,7 +157,33 @@ Widget _list(String t, Map<String, int> data, String cat, Color c, AccountData d
 }
 
 class TabInc extends StatelessWidget { const TabInc({super.key}); @override Widget build(BuildContext context) { final d = context.watch<AccountData>(); int si = d.income.values.fold(0, (a, b) => a + b); int sd = d.deduction.values.fold(0, (a, b) => a + b); return Column(children: [Expanded(child: Row(children: [Expanded(child: _list("세전 수입", d.income, 'inc', Colors.blue, d)), const VerticalDivider(width: 1), Expanded(child: _list("공제 내역", d.deduction, 'ded', Colors.red, d))])), _summaryBox([_row("실수령액", si - sd, Colors.indigo, b: true), Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text("세전 합계: ${d.nf.format(si)}", style: const TextStyle(fontSize: 11)), Text("공제 합계: ${d.nf.format(sd)}", style: const TextStyle(fontSize: 11, color: Colors.red))])])]); } }
-class TabExp extends StatelessWidget { const TabExp({super.key}); @override Widget build(BuildContext context) { final d = context.watch<AccountData>(); int sf = d.fixedExp.values.fold(0, (a,b)=>a+b); int sv = d.variableExp.values.fold(0, (a,b)=>a+b); int sc = d.childExp.values.fold(0, (a,b)=>a+b); return Column(children: [Expanded(child: Row(children: [Expanded(child: _list("고정지출", d.fixedExp, 'fix', Colors.teal, d)), Expanded(child: _list("변동지출", d.variableExp, 'var', Colors.orange, d)), Expanded(child: _list("자녀지출", d.childExp, 'chi', Colors.purple, d))])), _summaryBox([_row("지출 총 합계", sf + sv + sc, Colors.deepOrange, b: true)])]); } }
+
+class TabExp extends StatelessWidget { 
+  const TabExp({super.key}); 
+  @override Widget build(BuildContext context) { 
+    final d = context.watch<AccountData>(); 
+    int sf = d.fixedExp.values.fold(0, (a,b)=>a+b); 
+    int sv = d.variableExp.values.fold(0, (a,b)=>a+b); 
+    int sc = d.childExp.values.fold(0, (a,b)=>a+b); 
+    return Column(children: [
+      Expanded(child: Row(children: [
+        Expanded(child: _list("고정지출", d.fixedExp, 'fix', Colors.teal, d)), 
+        Expanded(child: _list("변동지출", d.variableExp, 'var', Colors.orange, d)), 
+        Expanded(child: _list("자녀지출", d.childExp, 'chi', Colors.purple, d))
+      ])), 
+      _summaryBox([
+        // 지출 분류별 소계 다시 추가
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text("고정: ${d.nf.format(sf)}", style: const TextStyle(fontSize: 10, color: Colors.teal)),
+          Text("변동: ${d.nf.format(sv)}", style: const TextStyle(fontSize: 10, color: Colors.orange)),
+          Text("자녀: ${d.nf.format(sc)}", style: const TextStyle(fontSize: 10, color: Colors.purple)),
+        ]),
+        const Divider(height: 12),
+        _row("지출 총 합계", sf + sv + sc, Colors.deepOrange, b: true)
+      ])
+    ]); 
+  } 
+}
 
 class TabCard extends StatelessWidget {
   const TabCard({super.key});
